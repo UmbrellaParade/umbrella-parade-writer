@@ -1,0 +1,523 @@
+:root {
+  color: #1b1a17;
+  background: #f4f1eb;
+  font-family:
+    "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    linear-gradient(90deg, rgba(22, 95, 91, 0.08), transparent 34%),
+    linear-gradient(180deg, #fbfaf7 0%, #eee8df 100%);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #cec5b8;
+  background: #fffdf8;
+  color: #29251f;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #857461;
+}
+
+a {
+  color: #0b61d8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.topbar {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto minmax(260px, 1fr);
+  align-items: center;
+  gap: 20px;
+  padding: 14px 24px;
+  border-bottom: 1px solid #d5cabc;
+  background: rgba(255, 253, 248, 0.94);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.brand-lockup {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.brand-lockup svg {
+  color: #0b615c;
+}
+
+.brand-lockup h1,
+.brand-lockup p {
+  margin: 0;
+}
+
+.brand-lockup h1 {
+  font-size: 1.35rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.eyebrow {
+  font-size: 0.74rem;
+  color: #806a48;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.tabbar,
+.exportbar,
+.segmented,
+.tool-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabbar button,
+.exportbar button,
+.tool-buttons button,
+.segmented button,
+.primary-action {
+  min-height: 38px;
+  border-radius: 8px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.tabbar button.active,
+.segmented button.active {
+  color: #fffdf8;
+  border-color: #153f3d;
+  background: #153f3d;
+}
+
+.exportbar {
+  justify-content: flex-end;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 18px;
+  padding: 18px;
+  min-height: 0;
+}
+
+.outline-panel,
+.settings-panel,
+.provider-card {
+  border: 1px solid #d7cdbf;
+  border-radius: 8px;
+  background: rgba(255, 253, 248, 0.92);
+}
+
+.outline-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: calc(100vh - 110px);
+  padding: 16px;
+  position: sticky;
+  top: 90px;
+}
+
+.field-label,
+.panel-title {
+  font-size: 0.78rem;
+  color: #6f5d45;
+  font-weight: 700;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid #cfc4b5;
+  border-radius: 8px;
+  background: #fffdfa;
+  color: #191817;
+  outline: none;
+}
+
+input,
+select {
+  min-height: 40px;
+  padding: 0 11px;
+}
+
+textarea:focus,
+input:focus,
+select:focus {
+  border-color: #0b615c;
+  box-shadow: 0 0 0 3px rgba(11, 97, 92, 0.16);
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.stats-row span,
+.status-pill {
+  border-radius: 8px;
+  background: #ebe1d0;
+  color: #44382b;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.outline-list {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.outline-list .panel-title {
+  margin: 0 0 4px;
+}
+
+.toc-link {
+  display: block;
+  line-height: 1.45;
+  font-size: 0.9rem;
+}
+
+.toc-link.level-2 {
+  padding-left: 16px;
+  font-size: 0.82rem;
+}
+
+.muted {
+  color: #8b7c6a;
+  font-size: 0.88rem;
+}
+
+.writer-grid {
+  min-height: calc(100vh - 110px);
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 14px;
+}
+
+.control-strip {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.editor-pane,
+.preview-page {
+  min-height: 0;
+  height: calc(100vh - 178px);
+  border-radius: 8px;
+  border: 1px solid #d6ccbe;
+  background: #fffefa;
+  overflow: auto;
+}
+
+.editor-pane textarea {
+  height: 100%;
+  resize: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 28px;
+  line-height: 1.9;
+  font-family:
+    "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+  font-size: 1.03rem;
+  background: transparent;
+}
+
+.preview-page {
+  padding: 44px;
+  font-family:
+    "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+  line-height: 2;
+  color: #151311;
+}
+
+.preview-page h1,
+.preview-page h2,
+.preview-page p {
+  margin-top: 0;
+}
+
+.preview-page h1 {
+  font-size: 1.5rem;
+  margin-bottom: 32px;
+  break-before: page;
+}
+
+.preview-page h2 {
+  font-size: 1.14rem;
+  margin-bottom: 24px;
+}
+
+.preview-page p {
+  margin-bottom: 1.4em;
+}
+
+.preview-page ruby rt {
+  font-size: 0.5em;
+  color: #201b16;
+}
+
+.preview-page.vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  padding: 36px 42px;
+}
+
+.preview-page.kindle {
+  max-width: 760px;
+  margin-inline: auto;
+  box-shadow: inset 0 0 0 10px #f8f5ef;
+}
+
+.preview-page.shimauma {
+  aspect-ratio: 0.706;
+  max-width: 620px;
+  margin-inline: auto;
+  border-color: #9f8b74;
+  box-shadow: inset 0 0 0 26px #fbfaf6;
+}
+
+.qr-workspace {
+  min-height: calc(100vh - 110px);
+  display: grid;
+  grid-template-columns: 320px minmax(360px, 720px);
+  gap: 20px;
+  align-items: start;
+}
+
+.settings-panel {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.primary-action {
+  margin-top: 8px;
+  background: #153f3d;
+  border-color: #153f3d;
+  color: #fffdf8;
+}
+
+.qr-card {
+  position: relative;
+  aspect-ratio: 1;
+  width: min(100%, 680px);
+  background: #ffffff;
+  border: 2px solid #111;
+  padding: clamp(34px, 5vw, 58px);
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  align-items: center;
+  justify-items: center;
+  overflow: hidden;
+}
+
+.qr-card img {
+  width: min(76%, 440px);
+  aspect-ratio: 1;
+  display: block;
+}
+
+.qr-card h2 {
+  margin: 20px 0 4px;
+  font-size: clamp(1.7rem, 4vw, 2.7rem);
+  line-height: 1.1;
+  font-family: Arial, sans-serif;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.qr-card p {
+  margin: 0;
+  font-size: clamp(0.96rem, 2vw, 1.45rem);
+  line-height: 1.35;
+  text-align: center;
+  font-weight: 700;
+}
+
+.qr-card .corner {
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-color: #111;
+  border-style: solid;
+}
+
+.qr-card .top-left {
+  top: 18px;
+  left: 18px;
+  border-width: 4px 0 0 4px;
+  border-radius: 28px 0 0;
+}
+
+.qr-card .top-right {
+  top: 18px;
+  right: 18px;
+  border-width: 4px 4px 0 0;
+  border-radius: 0 28px 0 0;
+}
+
+.qr-card .bottom-left {
+  bottom: 18px;
+  left: 18px;
+  border-width: 0 0 4px 4px;
+  border-radius: 0 0 0 28px;
+}
+
+.qr-card .bottom-right {
+  right: 18px;
+  bottom: 18px;
+  border-width: 0 4px 4px 0;
+  border-radius: 0 0 28px;
+}
+
+.qr-card.classic {
+  border-width: 6px;
+  box-shadow: inset 0 0 0 10px #fff, inset 0 0 0 12px #111;
+}
+
+.qr-card.minimal {
+  border-width: 1px;
+}
+
+.qr-card.minimal .corner {
+  display: none;
+}
+
+.settings-grid {
+  align-content: start;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.provider-card {
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+}
+
+.provider-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-heading svg {
+  color: #b84c35;
+}
+
+.provider-heading h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.future-card {
+  background: linear-gradient(135deg, #fffdf8, #f1eadf);
+}
+
+@media (max-width: 1100px) {
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .exportbar {
+    justify-content: flex-start;
+  }
+
+  .workspace,
+  .writer-grid,
+  .qr-workspace,
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .outline-panel {
+    position: static;
+    min-height: auto;
+  }
+
+  .editor-pane,
+  .preview-page {
+    height: 58vh;
+  }
+}
+
+@media (max-width: 640px) {
+  .topbar,
+  .workspace {
+    padding: 12px;
+  }
+
+  .tabbar,
+  .exportbar,
+  .control-strip {
+    align-items: stretch;
+  }
+
+  .tabbar,
+  .exportbar,
+  .segmented,
+  .tool-buttons {
+    flex-wrap: wrap;
+  }
+
+  .preview-page,
+  .editor-pane textarea {
+    padding: 20px;
+  }
+}
