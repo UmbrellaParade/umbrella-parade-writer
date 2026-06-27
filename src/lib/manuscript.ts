@@ -92,7 +92,7 @@ export function formatInline(escapedText: string): string {
 export function createKindleNav(toc: TocItem[]) {
   return toc
     .filter((item) => item.level === 1)
-    .map((item) => `<li><a href="#${item.id}">${escapeHtml(item.title)}</a></li>`)
+    .map((item) => `<li><a href="content.xhtml#${item.id}">${escapeHtml(item.title)}</a></li>`)
     .join("");
 }
 
