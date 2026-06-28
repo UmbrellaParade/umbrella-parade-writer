@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ChangeEvent, ClipboardEvent, MouseEvent } from "react";
+import type { CSSProperties, ChangeEvent, ClipboardEvent, MouseEvent, WheelEvent } from "react";
 import html2canvas from "html2canvas";
 import { saveAs } from "file-saver";
 import {
@@ -701,6 +701,16 @@ function App() {
     });
   };
 
+  const handlePreviewWheel = (event: WheelEvent<HTMLElement>) => {
+    const preview = previewRef.current;
+    if (!preview || !pageBreaks.pageGuide || preview.scrollWidth <= preview.clientWidth) return;
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+
+    event.preventDefault();
+    const delta = direction === "vertical" ? -event.deltaY : event.deltaY;
+    preview.scrollBy({ left: delta, behavior: "auto" });
+  };
+
   const focusEditorHeading = (id: string) => {
     if (editorMode === "visual") {
       const visualEditor = visualEditorRef.current;
@@ -1153,6 +1163,7 @@ function App() {
                 pageBreaks.pageGuide ? "show-page-guides" : ""
               }`}
               onClick={handlePreviewClick}
+              onWheel={handlePreviewWheel}
             >
               {pageBreaks.pageGuide ? (
                 <div className="preview-page-list">
@@ -1464,7 +1475,8 @@ function paginatePreviewHtml(
   const blocks = html
     .split("\n")
     .map((block) => block.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .flatMap((block) => splitPreviewBlock(block, typography, direction, target));
   const capacity = getPreviewPageCapacity(typography, direction, target);
   const pages: PreviewPage[] = [];
   let currentBlocks: string[] = [];
@@ -1508,12 +1520,18 @@ function getPreviewPageCapacity(
   direction: WritingDirection,
   target: SalesChannel,
 ) {
+  const fontScaleFromMinimum = 14 / typography.fontSize;
   const fontScale = 16 / typography.fontSize;
-  if (direction === "vertical") {
-    return Math.max(12, Math.floor((target === "shimauma" ? 18 : 16) * fontScale));
+
+  if (target === "kindle" && direction === "horizontal") {
+    return Math.max(24, Math.floor(45 * fontScaleFromMinimum));
   }
 
-  return Math.max(14, Math.floor((target === "shimauma" ? 24 : 20) * fontScale));
+  if (direction === "vertical") {
+    return Math.max(16, Math.floor((target === "shimauma" ? 24 : 22) * fontScale));
+  }
+
+  return Math.max(22, Math.floor((target === "shimauma" ? 34 : 32) * fontScale));
 }
 
 function estimatePreviewBlockUnits(
@@ -1529,21 +1547,138 @@ function estimatePreviewBlockUnits(
   }
 
   const textLength = getVisibleTextLength(block);
-  const fontScale = 16 / typography.fontSize;
+  const charsPerLine = getPreviewCharsPerLine(typography, direction, target);
 
   if (direction === "vertical") {
-    const charsPerColumn = Math.max(22, Math.floor((target === "shimauma" ? 44 : 38) * fontScale));
-    const columns = Math.max(1, Math.ceil(textLength / charsPerColumn));
+    const columns = Math.max(1, Math.ceil(textLength / charsPerLine));
     if (/^<h1\b/.test(block)) return columns + 1.4;
     if (/^<h2\b/.test(block)) return columns + 0.9;
     return columns + 0.35;
   }
 
-  const charsPerLine = Math.max(12, Math.floor((target === "shimauma" ? 27 : 24) * fontScale));
   const lines = Math.max(1, Math.ceil(textLength / charsPerLine));
-  if (/^<h1\b/.test(block)) return lines + 2.8;
-  if (/^<h2\b/.test(block)) return lines + 1.8;
-  return lines + 0.7;
+  if (/^<h1\b/.test(block)) return target === "kindle" ? lines + 1.8 : lines + 2.8;
+  if (/^<h2\b/.test(block)) return target === "kindle" ? lines + 1.2 : lines + 1.8;
+  return target === "kindle" ? lines + 0.25 : lines + 0.7;
+}
+
+function getPreviewCharsPerLine(
+  typography: TypographySettings,
+  direction: WritingDirection,
+  target: SalesChannel,
+) {
+  const fontScaleFromMinimum = 14 / typography.fontSize;
+  const fontScale = 16 / typography.fontSize;
+
+  if (target === "kindle" && direction === "horizontal") {
+    return Math.max(18, Math.floor(32 * fontScaleFromMinimum));
+  }
+
+  if (direction === "vertical") {
+    return Math.max(24, Math.floor((target === "shimauma" ? 48 : 44) * fontScale));
+  }
+
+  return Math.max(16, Math.floor((target === "shimauma" ? 30 : 28) * fontScale));
+}
+
+function splitPreviewBlock(
+  block: string,
+  typography: TypographySettings,
+  direction: WritingDirection,
+  target: SalesChannel,
+) {
+  if (!/^<p\b/i.test(block)) return [block];
+
+  const capacity = getPreviewPageCapacity(typography, direction, target);
+  const units = estimatePreviewBlockUnits(block, typography, direction, target);
+  if (units <= capacity) return [block];
+
+  const charsPerLine = getPreviewCharsPerLine(typography, direction, target);
+  const maxChars = Math.max(charsPerLine * 4, Math.floor(charsPerLine * Math.max(1, capacity - 1)));
+  const fragments = splitParagraphBlock(block, maxChars);
+  return fragments.length ? fragments : [block];
+}
+
+function splitParagraphBlock(block: string, maxChars: number) {
+  const parsed = new DOMParser().parseFromString(block, "text/html");
+  const paragraph = parsed.body.firstElementChild;
+  if (!paragraph) return [];
+
+  const tokens = createPreviewInlineTokens(Array.from(paragraph.childNodes), maxChars);
+  const chunks: string[] = [];
+  let currentHtml = "";
+  let currentChars = 0;
+
+  tokens.forEach((token) => {
+    if (currentHtml && currentChars + token.length > maxChars) {
+      chunks.push(`<p>${currentHtml}</p>`);
+      currentHtml = "";
+      currentChars = 0;
+    }
+
+    currentHtml += token.html;
+    currentChars += token.length;
+  });
+
+  if (currentHtml) chunks.push(`<p>${currentHtml}</p>`);
+  return chunks;
+}
+
+function createPreviewInlineTokens(nodes: Node[], maxChars: number): { html: string; length: number }[] {
+  return nodes.flatMap((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return splitPreviewText(node.textContent || "", maxChars).map((text) => ({
+        html: escapeHtml(text),
+        length: text.replace(/\s/g, "").length,
+      }));
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return [];
+
+    const element = node as Element;
+    if (element.tagName.toLowerCase() === "br") {
+      return [{ html: "<br />", length: 1 }];
+    }
+
+    const html = element.outerHTML;
+    return [{ html, length: Math.max(1, getVisibleTextLength(html)) }];
+  });
+}
+
+function splitPreviewText(text: string, maxChars: number) {
+  const parts = text.match(/[^。！？!?]+[。！？!?]?|[。！？!?]+|\s+/g) || [text];
+  const chunks: string[] = [];
+  let current = "";
+  let currentLength = 0;
+
+  const pushCurrent = () => {
+    if (!current) return;
+    chunks.push(current);
+    current = "";
+    currentLength = 0;
+  };
+
+  parts.forEach((part) => {
+    const partLength = part.replace(/\s/g, "").length;
+
+    if (partLength > maxChars) {
+      pushCurrent();
+      for (let index = 0; index < part.length; index += maxChars) {
+        chunks.push(part.slice(index, index + maxChars));
+      }
+      return;
+    }
+
+    if (current && currentLength + partLength > maxChars) {
+      pushCurrent();
+    }
+
+    current += part;
+    currentLength += partLength;
+  });
+
+  pushCurrent();
+  return chunks;
 }
 
 function getVisibleTextLength(html: string) {

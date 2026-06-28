@@ -638,11 +638,13 @@ select:focus {
 }
 
 .preview-sheet.kindle {
-  aspect-ratio: 500 / 710;
+  aspect-ratio: 420 / 710;
   height: min(100%, 710px);
   width: auto;
   min-height: 0;
-  padding: clamp(24px, 5vh, 44px);
+  padding: clamp(10px, 1.7vh, 14px);
+  font-size: max(10px, calc(var(--writer-font-size) * 0.76));
+  line-height: 1.2;
 }
 
 .preview-sheet.shimauma {
@@ -689,7 +691,7 @@ select:focus {
 }
 
 .preview-page h1 {
-  font-size: 1.5rem;
+  font-size: 1.5em;
   font-weight: 700;
   margin-bottom: 0;
   margin-block-end: 32px;
@@ -700,7 +702,7 @@ select:focus {
 }
 
 .preview-page h2 {
-  font-size: 1.14rem;
+  font-size: 1.14em;
   font-weight: 700;
   margin-bottom: 0;
   margin-block-end: 24px;
@@ -709,6 +711,18 @@ select:focus {
 .preview-page p {
   margin-bottom: 0;
   margin-block-end: 1.4em;
+}
+
+.preview-sheet.kindle h1 {
+  margin-block-end: 1.1em;
+}
+
+.preview-sheet.kindle h2 {
+  margin-block-end: 0.9em;
+}
+
+.preview-sheet.kindle p {
+  margin-block-end: 0.75em;
 }
 
 .preview-page ruby rt {
