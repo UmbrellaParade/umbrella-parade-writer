@@ -647,7 +647,9 @@ select:focus {
   line-height: 2;
   color: #151311;
   background: #eee6da;
+  overflow-wrap: anywhere;
   scroll-behavior: smooth;
+  word-break: break-word;
   overscroll-behavior: contain;
 }
 
@@ -723,6 +725,7 @@ select:focus {
 }
 
 .preview-sheet-body {
+  max-width: 100%;
   min-height: 100%;
 }
 
@@ -868,8 +871,15 @@ select:focus {
 
 .preview-page .manuscript-toc a {
   color: #0b61d8;
+  overflow-wrap: anywhere;
   text-decoration: underline;
   text-underline-offset: 2px;
+  word-break: break-word;
+}
+
+.preview-page a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .preview-page:not(.show-page-guides).vertical {
