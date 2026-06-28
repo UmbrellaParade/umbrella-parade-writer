@@ -124,6 +124,11 @@ type DocsSnapshotBlock = {
 type DocsSnapshot = {
   title?: string;
   blocks?: DocsSnapshotBlock[];
+  toc?: Array<{
+    id?: string;
+    title?: string;
+    level?: number;
+  }>;
   updatedAt?: string;
 };
 
@@ -1627,10 +1632,10 @@ function getPreviewPageCapacity(
   }
 
   if (direction === "vertical") {
-    return Math.max(16, Math.floor((target === "shimauma" ? 24 : 22) * fontScale));
+    return Math.max(8, Math.floor((target === "shimauma" ? 12 : 22) * fontScale));
   }
 
-  return Math.max(22, Math.floor((target === "shimauma" ? 34 : 32) * fontScale));
+  return Math.max(12, Math.floor((target === "shimauma" ? 20 : 32) * fontScale));
 }
 
 function estimatePreviewBlockUnits(
@@ -1674,10 +1679,10 @@ function getPreviewCharsPerLine(
   }
 
   if (direction === "vertical") {
-    return Math.max(24, Math.floor((target === "shimauma" ? 48 : 44) * fontScale));
+    return Math.max(20, Math.floor((target === "shimauma" ? 38 : 44) * fontScale));
   }
 
-  return Math.max(16, Math.floor((target === "shimauma" ? 30 : 28) * fontScale));
+  return Math.max(16, Math.floor((target === "shimauma" ? 26 : 28) * fontScale));
 }
 
 function splitPreviewBlock(
@@ -1853,31 +1858,174 @@ function isAllowedDocsBridgeOrigin(origin: string) {
 
 function convertDocsSnapshotToManuscript(snapshot: DocsSnapshot) {
   const blocks = Array.isArray(snapshot.blocks) ? snapshot.blocks : [];
-  const lines = blocks.map((block) => {
-    if (block.type === "pageBreak") return "[[PAGE_BREAK]]";
-    if (block.type === "toc") return "[[TOC]]";
+  const tocItems = normalizeDocsTocItems(snapshot.toc);
+  const usedInferredHeadings = new Map<string, number>();
+  const lines: string[] = [];
+  let looseTocInserted = false;
+  let insideLooseToc = false;
 
-    const text = docsSegmentsToMarkdown(block.segments, block.text || "");
-    if (block.headingLevel === 1) return `# ${text || "無題の見出し"}`;
-    if (block.headingLevel && block.headingLevel >= 2) return `## ${text || "無題の見出し"}`;
-    if (block.type === "listItem") return text ? `- ${text}` : "";
-    return text;
+  blocks.forEach((block) => {
+    if (block.type === "pageBreak") {
+      insideLooseToc = false;
+      lines.push("[[PAGE_BREAK]]");
+      return;
+    }
+
+    if (block.type === "toc") {
+      insideLooseToc = false;
+      lines.push("[[TOC]]");
+      return;
+    }
+
+    const text = docsSegmentsToMarkdown(block.segments, block.text || "", tocItems);
+    const plainText = stripMarkdownLinks(text).trim();
+
+    if (isDocsTocBlockText(text, tocItems) || isStandaloneDocsTocHeading(plainText, tocItems)) {
+      if (!looseTocInserted) {
+        lines.push("[[TOC]]");
+        looseTocInserted = true;
+      }
+      insideLooseToc = true;
+      return;
+    }
+
+    if (insideLooseToc && !block.headingLevel && isDocsTocEntryText(text, tocItems)) {
+      return;
+    }
+
+    insideLooseToc = false;
+
+    const headingLevel = getDocsHeadingLevel(block, plainText, tocItems, usedInferredHeadings);
+    if (headingLevel === 1) {
+      lines.push(`# ${plainText || "無題の見出し"}`);
+      return;
+    }
+    if (headingLevel >= 2) {
+      lines.push(`## ${plainText || "無題の見出し"}`);
+      return;
+    }
+    if (block.type === "listItem") {
+      lines.push(text ? `- ${text}` : "");
+      return;
+    }
+    lines.push(text);
   });
 
   return lines.join("\n\n").replace(/\n{4,}/g, "\n\n\n").trim() || sampleManuscript;
 }
 
-function docsSegmentsToMarkdown(segments: DocsSnapshotSegment[] | undefined, fallback: string) {
+type NormalizedDocsTocItem = {
+  id: string;
+  title: string;
+  level: 1 | 2;
+  normalizedTitle: string;
+};
+
+function normalizeDocsTocItems(toc: DocsSnapshot["toc"]): NormalizedDocsTocItem[] {
+  if (!Array.isArray(toc)) return [];
+
+  return toc
+    .map((item, index) => {
+      const title = String(item.title || "").trim();
+      if (!title) return null;
+      return {
+        id: toAnchorId(title, index + 1),
+        title,
+        level: item.level === 2 ? 2 : 1,
+        normalizedTitle: normalizeDocsTitle(title),
+      };
+    })
+    .filter((item): item is NormalizedDocsTocItem => Boolean(item?.title));
+}
+
+function getDocsHeadingLevel(
+  block: DocsSnapshotBlock,
+  plainText: string,
+  tocItems: NormalizedDocsTocItem[],
+  usedInferredHeadings: Map<string, number>,
+) {
+  if (block.headingLevel) return block.headingLevel;
+
+  const normalizedText = normalizeDocsTitle(plainText);
+  if (!normalizedText) return 0;
+
+  const matches = tocItems.filter((item) => item.normalizedTitle === normalizedText);
+  if (!matches.length) return 0;
+
+  const usedCount = usedInferredHeadings.get(normalizedText) || 0;
+  const match = matches[Math.min(usedCount, matches.length - 1)];
+  usedInferredHeadings.set(normalizedText, usedCount + 1);
+  return match.level;
+}
+
+function isDocsTocBlockText(text: string, tocItems: NormalizedDocsTocItem[]) {
+  if (!tocItems.length) return false;
+
+  const plainText = stripMarkdownLinks(text).trim();
+  if (!plainText) return false;
+
+  const normalizedText = normalizeDocsTitle(plainText);
+  const titleMatches = tocItems.filter(
+    (item) => item.normalizedTitle && normalizedText.includes(item.normalizedTitle),
+  ).length;
+  const looksLikeToc = /目次|contents|tableofcontents/i.test(normalizedText);
+
+  return (looksLikeToc && titleMatches >= 1) || titleMatches >= 3;
+}
+
+function isStandaloneDocsTocHeading(text: string, tocItems: NormalizedDocsTocItem[]) {
+  if (!tocItems.length) return false;
+  const normalizedText = normalizeDocsTitle(text);
+  return /^目次/.test(normalizedText) || normalizedText === "contents" || normalizedText === "tableofcontents";
+}
+
+function isDocsTocEntryText(text: string, tocItems: NormalizedDocsTocItem[]) {
+  const normalizedText = normalizeDocsTitle(stripMarkdownLinks(text));
+  return Boolean(normalizedText && tocItems.some((item) => item.normalizedTitle === normalizedText));
+}
+
+function docsSegmentsToMarkdown(
+  segments: DocsSnapshotSegment[] | undefined,
+  fallback: string,
+  tocItems: NormalizedDocsTocItem[],
+) {
   const source = Array.isArray(segments) && segments.length ? segments : [{ text: fallback, url: "" }];
   return source
     .map((segment) => {
       const text = String(segment.text || "");
       const url = String(segment.url || "").trim();
       if (!text) return "";
+      const internalId = resolveDocsInternalLink(text, url, tocItems);
+      if (internalId) return `[${escapeMarkdownLinkLabel(text)}](#${internalId})`;
       if (!/^https?:\/\//i.test(url)) return text;
       return `[${escapeMarkdownLinkLabel(text)}](${url})`;
     })
     .join("");
+}
+
+function resolveDocsInternalLink(text: string, url: string, tocItems: NormalizedDocsTocItem[]) {
+  if (!url || !tocItems.length) return "";
+  const normalizedText = normalizeDocsTitle(text);
+  if (!normalizedText) return "";
+
+  const looksInternal =
+    !/^https?:\/\//i.test(url) || isGoogleDocsHeadingLink(url) || /#heading=|heading=h\.|heading\./i.test(url);
+  if (!looksInternal) return "";
+
+  return tocItems.find((item) => item.normalizedTitle === normalizedText)?.id || "";
+}
+
+function stripMarkdownLinks(value: string) {
+  return value.replace(/\[([^\]]+)\]\((?:#[^)]+|https?:\/\/[^)\s]+)\)/g, "$1");
+}
+
+function normalizeDocsTitle(value: string) {
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t\r\n]+/g, "")
+    .replace(/[「」『』【】\[\]（）()・:：,，.．\-‐ー―–—]/g, "")
+    .trim()
+    .toLowerCase();
 }
 
 function escapeMarkdownLinkLabel(value: string) {
