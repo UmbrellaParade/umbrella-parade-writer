@@ -3,7 +3,7 @@ import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
-import type { RenderedManuscript, TocItem, TypographySettings } from "../types";
+import type { PageBreakSettings, RenderedManuscript, TocItem, TypographySettings } from "../types";
 import {
   createKindleNav,
   dataUrlToBytes,
@@ -17,13 +17,18 @@ const fallbackTypography: TypographySettings = {
   fontSize: 16,
 };
 
+const fallbackPageBreaks: PageBreakSettings = {
+  chapterHead: true,
+};
+
 export async function exportDocx(
   markdown: string,
   title: string,
   rendered: RenderedManuscript,
   typography: TypographySettings = fallbackTypography,
+  pageBreaks: PageBreakSettings = fallbackPageBreaks,
 ) {
-  const children = await createDocxChildren(markdown, rendered, typography);
+  const children = await createDocxChildren(markdown, rendered, typography, pageBreaks);
 
   const doc = new Document({
     sections: [
@@ -58,6 +63,7 @@ export async function exportEpub(
   rendered: RenderedManuscript,
   title: string,
   typography: TypographySettings = fallbackTypography,
+  pageBreaks: PageBreakSettings = fallbackPageBreaks,
 ) {
   const zip = new JSZip();
   let contentHtml = rendered.html;
@@ -79,7 +85,7 @@ export async function exportEpub(
 </container>`,
   );
 
-  zip.file("OEBPS/content.xhtml", wrapXhtml(title, contentHtml, typography));
+  zip.file("OEBPS/content.xhtml", wrapXhtml(title, contentHtml, typography, pageBreaks));
   zip.file("OEBPS/nav.xhtml", createNavXhtml(title, rendered.toc));
   zip.file("OEBPS/content.opf", createOpf(title, rendered));
 
@@ -91,7 +97,16 @@ export async function exportEpub(
   saveAs(blob, `${safeFilename(title)}.epub`);
 }
 
-function wrapXhtml(title: string, body: string, typography: TypographySettings) {
+function wrapXhtml(
+  title: string,
+  body: string,
+  typography: TypographySettings,
+  pageBreaks: PageBreakSettings,
+) {
+  const chapterBreakCss = pageBreaks.chapterHead
+    ? "h1 { break-before: page; page-break-before: always; font-size: 1.5em; }"
+    : "h1 { font-size: 1.5em; }";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
@@ -101,7 +116,7 @@ function wrapXhtml(title: string, body: string, typography: TypographySettings) 
     <style>
       body { font-family: ${epubFontFamily(typography)}; font-size: ${typography.fontSize}px; line-height: 1.8; }
       a { color: #0b61d8; text-decoration: underline; }
-      h1 { break-before: page; page-break-before: always; font-size: 1.5em; }
+      ${chapterBreakCss}
       .manuscript-toc { margin: 1.5em 0 2em; }
       .manuscript-toc ol { padding-inline-start: 1.5em; }
       .manuscript-toc .toc-level-2 { margin-inline-start: 1em; }
@@ -138,6 +153,7 @@ async function createDocxChildren(
   markdown: string,
   rendered: RenderedManuscript,
   typography: TypographySettings,
+  pageBreaks: PageBreakSettings,
 ) {
   const children: Paragraph[] = [];
   let seenHeadingOne = false;
@@ -201,7 +217,7 @@ async function createDocxChildren(
       children.push(
         new Paragraph({
           heading: HeadingLevel.HEADING_1,
-          pageBreakBefore: seenHeadingOne,
+          pageBreakBefore: pageBreaks.chapterHead && seenHeadingOne,
           spacing: { before: seenHeadingOne ? 0 : 480, after: 240 },
           children: [createTextRun(stripMarkupForDocx(line.replace(/^#\s+/, "")), typography, 6)],
         }),

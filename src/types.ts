@@ -1,8 +1,8 @@
 export type WritingDirection = "horizontal" | "vertical";
 
-export type PreviewTarget = "standard" | "kindle" | "shimauma";
+export type PreviewTarget = "kindle" | "shimauma";
 
-export type WorkspaceTab = "write" | "qr" | "settings";
+export type WorkspaceTab = "write" | "qr" | "aplus" | "settings";
 
 export type WriterFontFamily = "noto-sans-jp" | "shippori-mincho";
 
@@ -18,6 +18,20 @@ export interface AiProviderConfig {
 export interface TypographySettings {
   fontFamily: WriterFontFamily;
   fontSize: number;
+}
+
+export interface PageBreakSettings {
+  chapterHead: boolean;
+}
+
+export interface AplusSettings {
+  headline: string;
+  body: string;
+  imageKeyword: string;
+  imageSrc: string;
+  imageName: string;
+  overlayStyle: "dark" | "light";
+  textPosition: "left" | "right";
 }
 
 export interface TocItem {

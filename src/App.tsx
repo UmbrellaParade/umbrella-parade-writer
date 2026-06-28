@@ -4,6 +4,8 @@ import html2canvas from "html2canvas";
 import { saveAs } from "file-saver";
 import {
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
   Download,
   FileText,
   Heading1,
@@ -25,7 +27,9 @@ import { exportDocx, exportEpub, exportPdf } from "./lib/exporters";
 import { renderManuscript, sampleManuscript } from "./lib/manuscript";
 import type {
   AiProviderConfig,
+  AplusSettings,
   ImageAsset,
+  PageBreakSettings,
   PreviewTarget,
   TypographySettings,
   WorkspaceTab,
@@ -38,10 +42,12 @@ const storageKeys = {
   aiSettings: "umbrella-parade-writer:ai-settings",
   imageAssets: "umbrella-parade-writer:image-assets",
   typography: "umbrella-parade-writer:typography",
+  pageBreaks: "umbrella-parade-writer:page-breaks",
+  coverImage: "umbrella-parade-writer:cover-image",
+  aplus: "umbrella-parade-writer:aplus",
 };
 
 const previewLabels: Record<PreviewTarget, string> = {
-  standard: "標準",
   kindle: "Kindle",
   shimauma: "しまうま",
 };
@@ -58,6 +64,30 @@ const fontOptions: { value: TypographySettings["fontFamily"]; label: string }[] 
 
 const fontSizeOptions = [14, 16, 18, 20, 22];
 
+const defaultPageBreaks: PageBreakSettings = {
+  chapterHead: true,
+};
+
+const defaultAplus: AplusSettings = {
+  headline: "雨の記憶をたどる物語",
+  body: "Umbrella Paradeの世界観、登場人物、楽曲や記録室へつながる余韻を1枚にまとめます。",
+  imageKeyword: "幻想的な雨の街、傘、銀色の光",
+  imageSrc: "",
+  imageName: "",
+  overlayStyle: "dark",
+  textPosition: "left",
+};
+
+type CoverImageState = {
+  src: string;
+  name: string;
+};
+
+const defaultCoverImage: CoverImageState = {
+  src: "",
+  name: "",
+};
+
 function App() {
   const initialDraftRef = useRef<ReturnType<typeof loadInitialDraft> | null>(null);
   if (!initialDraftRef.current) initialDraftRef.current = loadInitialDraft();
@@ -71,6 +101,9 @@ function App() {
   const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget>("kindle");
   const [typography, setTypography] = useState<TypographySettings>(loadTypographySettings);
+  const [pageBreaks, setPageBreaks] = useState<PageBreakSettings>(loadPageBreakSettings);
+  const [coverImage, setCoverImage] = useState<CoverImageState>(loadCoverImage);
+  const [aplus, setAplus] = useState<AplusSettings>(loadAplusSettings);
   const [qrUrl, setQrUrl] = useState("https://example.com");
   const [qrTitle, setQrTitle] = useState("Glamorous Shadow");
   const [qrSubtitle, setQrSubtitle] = useState("ヴェル13世×カーラ・マンソン デュエットver");
@@ -83,6 +116,9 @@ function App() {
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLElement>(null);
   const qrCardRef = useRef<HTMLDivElement>(null);
+  const coverImageInputRef = useRef<HTMLInputElement>(null);
+  const aplusImageInputRef = useRef<HTMLInputElement>(null);
+  const aplusCardRef = useRef<HTMLDivElement>(null);
   const manuscriptImageInputRef = useRef<HTMLInputElement>(null);
   const qrImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -114,6 +150,18 @@ function App() {
   useEffect(() => {
     localStorage.setItem(storageKeys.typography, JSON.stringify(typography));
   }, [typography]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKeys.pageBreaks, JSON.stringify(pageBreaks));
+  }, [pageBreaks]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKeys.coverImage, JSON.stringify(coverImage));
+  }, [coverImage]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKeys.aplus, JSON.stringify(aplus));
+  }, [aplus]);
 
   useEffect(() => {
     let cancelled = false;
@@ -267,15 +315,48 @@ function App() {
     reader.readAsDataURL(file);
   };
 
+  const importCoverImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCoverImage({
+        src: typeof reader.result === "string" ? reader.result : "",
+        name: file.name,
+      });
+      setStatus("表紙を読み込みました");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const importAplusImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAplus((current) => ({
+        ...current,
+        imageSrc: typeof reader.result === "string" ? reader.result : "",
+        imageName: file.name,
+      }));
+      setStatus("A+画像を読み込みました");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleExportDocx = async () => {
     setStatus("DOCX作成中");
-    await exportDocx(manuscript, title, rendered, typography);
+    await exportDocx(manuscript, title, rendered, typography, pageBreaks);
     setStatus("DOCXを書き出しました");
   };
 
   const handleExportEpub = async () => {
     setStatus("EPUB作成中");
-    await exportEpub(rendered, title, typography);
+    await exportEpub(rendered, title, typography, pageBreaks);
     setStatus("EPUBを書き出しました");
   };
 
@@ -294,10 +375,73 @@ function App() {
     });
   };
 
+  const handleCoverDownload = () => {
+    if (!coverImage.src) return;
+    downloadDataUrl(coverImage.src, coverImage.name || `${title}-cover.png`);
+  };
+
+  const handleAplusImageDownload = () => {
+    if (!aplus.imageSrc) return;
+    downloadDataUrl(aplus.imageSrc, aplus.imageName || `${title}-aplus-background.png`);
+  };
+
+  const handleAplusDownload = async () => {
+    if (!aplusCardRef.current) return;
+    const canvas = await html2canvas(aplusCardRef.current, { backgroundColor: "#ffffff", scale: 2 });
+    canvas.toBlob((blob) => {
+      if (blob) saveAs(blob, `${safeDownloadName(title)}-aplus-1940x600.png`);
+    });
+  };
+
   const updateAiSetting = (providerKey: string, field: "apiKey" | "selectedModel", value: string) => {
     setAiSettings((current) =>
       current.map((item) => (item.key === providerKey ? { ...item, [field]: value } : item)),
     );
+  };
+
+  const updateAplusSetting = <K extends keyof AplusSettings>(field: K, value: AplusSettings[K]) => {
+    setAplus((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const scrollVerticalPreview = (side: "left" | "right") => {
+    const preview = previewRef.current;
+    if (!preview) return;
+
+    const amount = Math.max(220, Math.round(preview.clientWidth * 0.72));
+    preview.scrollBy({
+      left: side === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
+
+  const focusEditorHeading = (id: string) => {
+    const editor = editorRef.current;
+    const tocIndex = rendered.toc.findIndex((item) => item.id === id);
+    if (!editor || tocIndex < 0) return;
+
+    const normalized = manuscript.replace(/\r\n/g, "\n");
+    const lines = normalized.split("\n");
+    let cursor = 0;
+    let headingIndex = 0;
+
+    for (const line of lines) {
+      if (/^#{1,2}\s+/.test(line)) {
+        if (headingIndex === tocIndex) {
+          const lineHeight = parseFloat(window.getComputedStyle(editor).lineHeight) || 30;
+          const lineNumber = normalized.slice(0, cursor).split("\n").length - 1;
+          editor.focus();
+          editor.setSelectionRange(cursor, cursor + line.length);
+          editor.scrollTop = Math.max(0, lineNumber * lineHeight - 80);
+          return;
+        }
+        headingIndex += 1;
+      }
+
+      cursor += line.length + 1;
+    }
   };
 
   const jumpToHeading = (id: string) => {
@@ -305,6 +449,7 @@ function App() {
     setActiveHeadingId(id);
 
     window.setTimeout(() => {
+      focusEditorHeading(id);
       const headings = Array.from(previewRef.current?.querySelectorAll<HTMLElement>("[id]") || []);
       const heading = headings.find((element) => element.id === id);
       if (!heading) return;
@@ -351,6 +496,10 @@ function App() {
           <button className={activeTab === "qr" ? "active" : ""} onClick={() => setActiveTab("qr")}>
             <QrCode size={18} aria-hidden />
             QR
+          </button>
+          <button className={activeTab === "aplus" ? "active" : ""} onClick={() => setActiveTab("aplus")}>
+            <Sparkles size={18} aria-hidden />
+            A+
           </button>
           <button className={activeTab === "settings" ? "active" : ""} onClick={() => setActiveTab("settings")}>
             <Settings size={18} aria-hidden />
@@ -408,6 +557,20 @@ function App() {
           </div>
 
           <div className="status-pill">{status}</div>
+
+          {rendered.images.length > 0 && (
+            <div className="sidebar-image-panel" aria-label="本文画像">
+              <p className="panel-title">本文画像</p>
+              <div className="sidebar-image-list">
+                {rendered.images.map((image) => (
+                  <figure className="sidebar-image-card" key={image.id}>
+                    <img src={image.src} alt="" />
+                    <figcaption>{image.alt || image.id}</figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          )}
         </aside>
 
         {activeTab === "write" && (
@@ -444,25 +607,51 @@ function App() {
                 />
               </div>
 
-              <div className="segmented">
-                <button className={direction === "horizontal" ? "active" : ""} onClick={() => setDirection("horizontal")}>
-                  横書き
-                </button>
-                <button className={direction === "vertical" ? "active" : ""} onClick={() => setDirection("vertical")}>
-                  縦書き
-                </button>
-              </div>
-
-              <div className="segmented">
-                {(Object.keys(previewLabels) as PreviewTarget[]).map((target) => (
+              <div className="preview-control-group" aria-label="preview controls">
+                <span className="control-label">プレビュー</span>
+                <div className="segmented">
                   <button
-                    key={target}
-                    className={previewTarget === target ? "active" : ""}
-                    onClick={() => setPreviewTarget(target)}
+                    className={direction === "horizontal" ? "active" : ""}
+                    onClick={() => setDirection("horizontal")}
                   >
-                    {previewLabels[target]}
+                    横書き
                   </button>
-                ))}
+                  <button className={direction === "vertical" ? "active" : ""} onClick={() => setDirection("vertical")}>
+                    縦書き
+                  </button>
+                  {(Object.keys(previewLabels) as PreviewTarget[]).map((target) => (
+                    <button
+                      key={target}
+                      className={previewTarget === target ? "active" : ""}
+                      onClick={() => setPreviewTarget(target)}
+                    >
+                      {previewLabels[target]}
+                    </button>
+                  ))}
+                </div>
+                <label className="toggle-control">
+                  <input
+                    type="checkbox"
+                    checked={pageBreaks.chapterHead}
+                    onChange={(event) =>
+                      setPageBreaks((current) => ({
+                        ...current,
+                        chapterHead: event.target.checked,
+                      }))
+                    }
+                  />
+                  章頭改ページ
+                </label>
+                {direction === "vertical" && (
+                  <div className="vertical-scroll-buttons" aria-label="縦書き移動">
+                    <button title="左へ移動" onClick={() => scrollVerticalPreview("left")}>
+                      <ChevronLeft size={17} aria-hidden />
+                    </button>
+                    <button title="右へ移動" onClick={() => scrollVerticalPreview("right")}>
+                      <ChevronRight size={17} aria-hidden />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="typography-controls" aria-label="typography">
@@ -536,21 +725,11 @@ function App() {
                   }
                 }}
               />
-              {rendered.images.length > 0 && (
-                <div className="editor-image-strip" aria-label="本文画像">
-                  {rendered.images.map((image) => (
-                    <figure className="editor-image-card" key={image.id}>
-                      <img src={image.src} alt="" />
-                      <figcaption>{image.alt || image.id}</figcaption>
-                    </figure>
-                  ))}
-                </div>
-              )}
             </div>
 
             <article
               ref={previewRef}
-              className={`preview-page ${direction} ${previewTarget}`}
+              className={`preview-page ${direction} ${previewTarget} ${pageBreaks.chapterHead ? "break-chapters" : ""}`}
               onClick={handlePreviewClick}
               dangerouslySetInnerHTML={{ __html: rendered.html }}
             />
@@ -625,6 +804,134 @@ function App() {
               {qrImageSrc && <img src={qrImageSrc} alt="" />}
               <h2>{qrTitle}</h2>
               <p>{qrSubtitle}</p>
+            </div>
+          </section>
+        )}
+
+        {activeTab === "aplus" && (
+          <section className="aplus-workspace" aria-label="a plus maker">
+            <div className="settings-panel">
+              <div>
+                <p className="panel-title">表紙</p>
+                <input
+                  ref={coverImageInputRef}
+                  className="visually-hidden"
+                  type="file"
+                  accept="image/*"
+                  onChange={importCoverImage}
+                />
+                <div className="inline-actions">
+                  <button className="secondary-action" onClick={() => coverImageInputRef.current?.click()}>
+                    <Upload size={16} aria-hidden />
+                    表紙画像
+                  </button>
+                  <button className="secondary-action" onClick={handleCoverDownload} disabled={!coverImage.src}>
+                    <Download size={16} aria-hidden />
+                    表紙保存
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="panel-title">A+ 画像</p>
+                <input
+                  ref={aplusImageInputRef}
+                  className="visually-hidden"
+                  type="file"
+                  accept="image/*"
+                  onChange={importAplusImage}
+                />
+                <div className="inline-actions">
+                  <button className="secondary-action" onClick={() => aplusImageInputRef.current?.click()}>
+                    <Upload size={16} aria-hidden />
+                    背景画像
+                  </button>
+                  <button className="secondary-action" onClick={handleAplusImageDownload} disabled={!aplus.imageSrc}>
+                    <Download size={16} aria-hidden />
+                    背景保存
+                  </button>
+                </div>
+              </div>
+
+              <label className="field-label" htmlFor="aplus-keyword">
+                画像キーワード
+              </label>
+              <input
+                id="aplus-keyword"
+                value={aplus.imageKeyword}
+                onChange={(event) => updateAplusSetting("imageKeyword", event.target.value)}
+              />
+
+              <label className="field-label" htmlFor="aplus-headline">
+                見出し
+              </label>
+              <input
+                id="aplus-headline"
+                value={aplus.headline}
+                onChange={(event) => updateAplusSetting("headline", event.target.value)}
+              />
+
+              <label className="field-label" htmlFor="aplus-body">
+                説明文
+              </label>
+              <textarea
+                id="aplus-body"
+                className="compact-textarea"
+                value={aplus.body}
+                onChange={(event) => updateAplusSetting("body", event.target.value)}
+              />
+
+              <label className="field-label" htmlFor="aplus-position">
+                文字位置
+              </label>
+              <select
+                id="aplus-position"
+                value={aplus.textPosition}
+                onChange={(event) => updateAplusSetting("textPosition", event.target.value as AplusSettings["textPosition"])}
+              >
+                <option value="left">左</option>
+                <option value="right">右</option>
+              </select>
+
+              <label className="field-label" htmlFor="aplus-overlay">
+                文字枠
+              </label>
+              <select
+                id="aplus-overlay"
+                value={aplus.overlayStyle}
+                onChange={(event) => updateAplusSetting("overlayStyle", event.target.value as AplusSettings["overlayStyle"])}
+              >
+                <option value="dark">黒</option>
+                <option value="light">白</option>
+              </select>
+
+              <button className="primary-action" onClick={handleAplusDownload}>
+                <Download size={18} aria-hidden />
+                A+ PNG
+              </button>
+            </div>
+
+            <div className="aplus-preview-column">
+              <div className="cover-preview">
+                {coverImage.src ? (
+                  <img src={coverImage.src} alt="" />
+                ) : (
+                  <div className="empty-preview">表紙</div>
+                )}
+              </div>
+
+              <div
+                ref={aplusCardRef}
+                className={`aplus-card ${aplus.overlayStyle} text-${aplus.textPosition}`}
+                style={aplus.imageSrc ? { backgroundImage: `url(${aplus.imageSrc})` } : undefined}
+              >
+                {!aplus.imageSrc && <div className="aplus-placeholder">A+ 1940x600</div>}
+                <div className="aplus-text-panel">
+                  <p>{aplus.imageKeyword}</p>
+                  <h2>{aplus.headline}</h2>
+                  <span>{aplus.body}</span>
+                </div>
+              </div>
             </div>
           </section>
         )}
@@ -783,6 +1090,54 @@ function loadTypographySettings(): TypographySettings {
   }
 }
 
+function loadPageBreakSettings(): PageBreakSettings {
+  const stored = localStorage.getItem(storageKeys.pageBreaks);
+  if (!stored) return defaultPageBreaks;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<PageBreakSettings>;
+    return {
+      chapterHead: typeof parsed.chapterHead === "boolean" ? parsed.chapterHead : defaultPageBreaks.chapterHead,
+    };
+  } catch {
+    return defaultPageBreaks;
+  }
+}
+
+function loadCoverImage(): CoverImageState {
+  const stored = localStorage.getItem(storageKeys.coverImage);
+  if (!stored) return defaultCoverImage;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<CoverImageState>;
+    return {
+      src: parsed.src || "",
+      name: parsed.name || "",
+    };
+  } catch {
+    return defaultCoverImage;
+  }
+}
+
+function loadAplusSettings(): AplusSettings {
+  const stored = localStorage.getItem(storageKeys.aplus);
+  if (!stored) return defaultAplus;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<AplusSettings>;
+    return {
+      ...defaultAplus,
+      ...parsed,
+      overlayStyle: parsed.overlayStyle === "light" || parsed.overlayStyle === "dark" ? parsed.overlayStyle : "dark",
+      textPosition: parsed.textPosition === "right" || parsed.textPosition === "left" ? parsed.textPosition : "left",
+      imageSrc: parsed.imageSrc || "",
+      imageName: parsed.imageName || "",
+    };
+  } catch {
+    return defaultAplus;
+  }
+}
+
 function getWriterFontStack(fontFamily: TypographySettings["fontFamily"]) {
   if (fontFamily === "noto-sans-jp") {
     return '"Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", sans-serif';
@@ -809,6 +1164,16 @@ function fallbackCopyText(value: string) {
   helper.select();
   document.execCommand("copy");
   helper.remove();
+}
+
+async function downloadDataUrl(dataUrl: string, filename: string) {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  saveAs(blob, safeDownloadName(filename));
+}
+
+function safeDownloadName(value: string) {
+  return value.trim().replace(/[\\/:*?"<>|]/g, "_") || "umbrella-parade";
 }
 
 function loadAiSettings(): AiProviderConfig[] {

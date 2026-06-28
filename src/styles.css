@@ -41,6 +41,11 @@ button:hover {
   border-color: #857461;
 }
 
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 a {
   color: #0b61d8;
   text-decoration: underline;
@@ -212,6 +217,49 @@ select:focus {
   font-weight: 700;
 }
 
+.sidebar-image-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar-image-panel .panel-title {
+  margin: 0;
+}
+
+.sidebar-image-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.sidebar-image-card {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sidebar-image-card img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border: 1px solid #d3c6b6;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.sidebar-image-card figcaption {
+  color: #6b5b48;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .outline-list {
   min-height: 0;
   overflow: auto;
@@ -272,6 +320,49 @@ select:focus {
   padding-right: 4px;
 }
 
+.preview-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.control-label {
+  color: #6f5d45;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.toggle-control {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #44382b;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.toggle-control input {
+  width: 16px;
+  min-height: 16px;
+  accent-color: #153f3d;
+}
+
+.vertical-scroll-buttons {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.vertical-scroll-buttons button {
+  width: 38px;
+  min-height: 38px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .typography-controls {
   display: flex;
   align-items: center;
@@ -323,44 +414,6 @@ select:focus {
   background: transparent;
 }
 
-.editor-image-strip {
-  flex: 0 0 auto;
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  padding: 10px 12px;
-  border-top: 1px solid #e2d8ca;
-  background: #fbf7ef;
-}
-
-.editor-image-card {
-  flex: 0 0 96px;
-  margin: 0;
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-}
-
-.editor-image-card img {
-  width: 76px;
-  height: 76px;
-  object-fit: contain;
-  border: 1px solid #d3c6b6;
-  border-radius: 6px;
-  background: #ffffff;
-}
-
-.editor-image-card figcaption {
-  width: 100%;
-  color: #6b5b48;
-  font-size: 0.72rem;
-  line-height: 1.25;
-  text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .preview-page {
   padding: 44px;
   font-family: var(--writer-font-family);
@@ -379,15 +432,18 @@ select:focus {
 .preview-page h1 {
   font-size: 1.5rem;
   margin-bottom: 32px;
-  break-before: page;
-  page-break-before: always;
   scroll-margin-block-start: 28px;
   transition:
     background-color 180ms ease,
     box-shadow 180ms ease;
 }
 
-.preview-page h1.chapter-heading:not(:first-of-type) {
+.preview-page.break-chapters h1 {
+  break-before: page;
+  page-break-before: always;
+}
+
+.preview-page.break-chapters h1.chapter-heading:not(:first-of-type) {
   margin-top: 72px;
   padding-top: 36px;
   border-top: 1px dashed #c9bcaa;
@@ -470,7 +526,7 @@ select:focus {
 }
 
 .preview-page.kindle {
-  max-width: 620px;
+  max-width: 500px;
   margin-inline: auto;
   box-shadow: inset 0 0 0 10px #f8f5ef;
 }
@@ -483,7 +539,8 @@ select:focus {
   box-shadow: inset 0 0 0 26px #fbfaf6;
 }
 
-.qr-workspace {
+.qr-workspace,
+.aplus-workspace {
   min-height: calc(100vh - 110px);
   display: grid;
   grid-template-columns: 320px minmax(360px, 720px);
@@ -491,10 +548,21 @@ select:focus {
   align-items: start;
 }
 
+.aplus-workspace {
+  grid-template-columns: 340px minmax(420px, 1fr);
+}
+
 .settings-panel {
   padding: 18px;
   display: grid;
   gap: 12px;
+}
+
+.compact-textarea {
+  min-height: 110px;
+  padding: 10px 11px;
+  resize: vertical;
+  line-height: 1.6;
 }
 
 .inline-actions {
@@ -530,6 +598,108 @@ select:focus {
   background: #153f3d;
   border-color: #153f3d;
   color: #fffdf8;
+}
+
+.aplus-preview-column {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.cover-preview {
+  width: min(100%, 360px);
+  aspect-ratio: 1 / 1.6;
+  border: 1px solid #d6ccbe;
+  border-radius: 8px;
+  background: #fffefa;
+  overflow: hidden;
+}
+
+.cover-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  background: #ffffff;
+}
+
+.empty-preview,
+.aplus-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: #8b7c6a;
+  font-weight: 700;
+  background: repeating-linear-gradient(135deg, #fffefa 0 14px, #f1eadf 14px 28px);
+}
+
+.aplus-card {
+  position: relative;
+  width: min(100%, 970px);
+  aspect-ratio: 970 / 300;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid #d6ccbe;
+  background-color: #d8d1c5;
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  align-items: center;
+  padding: 34px;
+}
+
+.aplus-card.text-right {
+  justify-content: flex-end;
+}
+
+.aplus-card.text-left {
+  justify-content: flex-start;
+}
+
+.aplus-text-panel {
+  position: relative;
+  z-index: 1;
+  width: min(48%, 410px);
+  padding: 22px 24px;
+  border-radius: 8px;
+  backdrop-filter: blur(2px);
+}
+
+.aplus-card.dark .aplus-text-panel {
+  color: #fffdfa;
+  background: rgba(18, 17, 15, 0.72);
+}
+
+.aplus-card.light .aplus-text-panel {
+  color: #171512;
+  background: rgba(255, 253, 248, 0.84);
+}
+
+.aplus-text-panel p,
+.aplus-text-panel h2,
+.aplus-text-panel span {
+  margin: 0;
+}
+
+.aplus-text-panel p {
+  font-size: clamp(0.62rem, 1.2vw, 0.84rem);
+  line-height: 1.4;
+  opacity: 0.78;
+}
+
+.aplus-text-panel h2 {
+  margin-top: 8px;
+  font-size: clamp(1rem, 2.4vw, 1.7rem);
+  line-height: 1.22;
+  letter-spacing: 0;
+}
+
+.aplus-text-panel span {
+  display: block;
+  margin-top: 10px;
+  font-size: clamp(0.72rem, 1.35vw, 0.96rem);
+  line-height: 1.7;
 }
 
 .qr-card {
@@ -741,6 +911,7 @@ select:focus {
   .workspace,
   .writer-grid,
   .qr-workspace,
+  .aplus-workspace,
   .settings-grid {
     grid-template-columns: 1fr;
   }
@@ -778,5 +949,14 @@ select:focus {
   .preview-page,
   .editor-pane textarea {
     padding: 20px;
+  }
+
+  .aplus-card {
+    padding: 18px;
+  }
+
+  .aplus-text-panel {
+    width: 64%;
+    padding: 14px;
   }
 }
