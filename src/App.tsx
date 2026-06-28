@@ -180,6 +180,31 @@ function App() {
   }, [salesChannel]);
 
   useEffect(() => {
+    const preview = previewRef.current;
+    if (!preview || !pageBreaks.pageGuide) return;
+
+    let secondFrame = 0;
+    const alignPageStart = () => {
+      preview.scrollTop = 0;
+      preview.scrollLeft =
+        direction === "vertical"
+          ? Math.max(0, preview.scrollWidth - preview.clientWidth)
+          : 0;
+    };
+    const firstFrame = window.requestAnimationFrame(() => {
+      alignPageStart();
+      secondFrame = window.requestAnimationFrame(alignPageStart);
+    });
+    const timeout = window.setTimeout(alignPageStart, 80);
+
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      window.clearTimeout(timeout);
+    };
+  }, [direction, pageBreaks.pageGuide, previewPages.length, previewTarget]);
+
+  useEffect(() => {
     localStorage.setItem(storageKeys.coverImage, JSON.stringify(coverImage));
   }, [coverImage]);
 
