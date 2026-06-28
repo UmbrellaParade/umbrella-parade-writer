@@ -6,9 +6,7 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
-  Code2,
   Download,
-  Eye,
   FileText,
   Heading1,
   ImageIcon,
@@ -129,7 +127,7 @@ function App() {
   const [imageAssets, setImageAssets] = useState<ImageAsset[]>(initialDraftRef.current.imageAssets);
   const [undoStacks, setUndoStacks] = useState<ManuscriptHistory>(createEmptyHistory);
   const [redoStacks, setRedoStacks] = useState<ManuscriptHistory>(createEmptyHistory);
-  const [editorMode, setEditorMode] = useState<EditorMode>("visual");
+  const [editorMode] = useState<EditorMode>("visual");
   const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [typography, setTypography] = useState<TypographySettings>(loadTypographySettings);
   const [pageBreaks, setPageBreaks] = useState<PageBreakSettings>(loadPageBreakSettings);
@@ -426,18 +424,6 @@ function App() {
     });
   };
 
-  const handleEditorPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const html = event.clipboardData.getData("text/html");
-    if (!hasClipboardRichMarkup(html)) return;
-
-    const pasted = convertHtmlToManuscriptMarkdown(html);
-    if (!pasted.trim()) return;
-
-    event.preventDefault();
-    insertAtSelection(pasted);
-    setStatus("見出し付きで貼り付けました");
-  };
-
   const handleVisualPaste = (event: ClipboardEvent<HTMLDivElement>) => {
     const html = event.clipboardData.getData("text/html");
     const text = event.clipboardData.getData("text/plain");
@@ -447,23 +433,6 @@ function App() {
     event.preventDefault();
     insertVisualHtml(renderManuscript(pasted, imageAssets).html || `<p>${escapeHtml(text)}</p>`);
     setStatus(html ? "見出し付きで貼り付けました" : "貼り付けました");
-  };
-
-  const cutSelection = () => {
-    const editor = editorRef.current;
-    if (!editor) return false;
-
-    const start = editor.selectionStart;
-    const end = editor.selectionEnd;
-    if (start === end) return false;
-
-    copyTextToClipboard(manuscript.slice(start, end));
-    updateManuscript(`${manuscript.slice(0, start)}${manuscript.slice(end)}`);
-    window.requestAnimationFrame(() => {
-      editor.focus();
-      editor.setSelectionRange(start, start);
-    });
-    return true;
   };
 
   const applyHeadingOne = () => {
@@ -1056,17 +1025,6 @@ function App() {
                 />
               </div>
 
-              <div className="editor-mode-toggle segmented" aria-label="editor mode">
-                <button className={editorMode === "visual" ? "active" : ""} onClick={() => setEditorMode("visual")}>
-                  <Eye size={16} aria-hidden />
-                  ビジュアル
-                </button>
-                <button className={editorMode === "code" ? "active" : ""} onClick={() => setEditorMode("code")}>
-                  <Code2 size={16} aria-hidden />
-                  コード
-                </button>
-              </div>
-
               <div className="preview-control-group" aria-label="preview controls">
                 <span className="control-label">プレビュー：{salesChannelLabels[salesChannel]}</span>
                 <div className="segmented">
@@ -1159,77 +1117,38 @@ function App() {
             </div>
 
             <div className="editor-pane">
-              {editorMode === "visual" ? (
-                <div
-                  ref={visualEditorRef}
-                  className="visual-editor"
-                  contentEditable
-                  suppressContentEditableWarning
-                  spellCheck={false}
-                  aria-label="ビジュアル原稿エディタ"
-                  onInput={syncVisualEditorToManuscript}
-                  onPaste={handleVisualPaste}
-                  onClick={handleVisualEditorClick}
-                  onKeyDown={(event) => {
-                    const isUndo =
-                      (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
-                    const isRedo =
-                      (event.ctrlKey || event.metaKey) &&
-                      (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
-                    const isCut = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
+              <div
+                ref={visualEditorRef}
+                className="visual-editor"
+                contentEditable
+                suppressContentEditableWarning
+                spellCheck={false}
+                aria-label="ビジュアル原稿エディタ"
+                onInput={syncVisualEditorToManuscript}
+                onPaste={handleVisualPaste}
+                onClick={handleVisualEditorClick}
+                onKeyDown={(event) => {
+                  const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
+                  const isRedo =
+                    (event.ctrlKey || event.metaKey) &&
+                    (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
+                  const isCut = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
 
-                    if (isUndo) {
-                      event.preventDefault();
-                      undoManuscript();
-                    }
+                  if (isUndo) {
+                    event.preventDefault();
+                    undoManuscript();
+                  }
 
-                    if (isRedo) {
-                      event.preventDefault();
-                      redoManuscript();
-                    }
+                  if (isRedo) {
+                    event.preventDefault();
+                    redoManuscript();
+                  }
 
-                    if (isCut) {
-                      window.setTimeout(syncVisualEditorToManuscript, 0);
-                    }
-                  }}
-                />
-              ) : (
-                <div className="source-editor">
-                  <textarea
-                    ref={editorRef}
-                    value={manuscript}
-                    spellCheck={false}
-                    onChange={(event) => {
-                      setStatus("編集中");
-                      updateManuscript(event.target.value);
-                    }}
-                    onPaste={handleEditorPaste}
-                    onKeyDown={(event) => {
-                      const isUndo =
-                        (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
-                      const isRedo =
-                        (event.ctrlKey || event.metaKey) &&
-                        (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
-                      const isCut =
-                        (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
-
-                      if (isUndo) {
-                        event.preventDefault();
-                        undoManuscript();
-                      }
-
-                      if (isRedo) {
-                        event.preventDefault();
-                        redoManuscript();
-                      }
-
-                      if (isCut && cutSelection()) {
-                        event.preventDefault();
-                      }
-                    }}
-                  />
-                </div>
-              )}
+                  if (isCut) {
+                    window.setTimeout(syncVisualEditorToManuscript, 0);
+                  }
+                }}
+              />
             </div>
 
             <article
@@ -2001,12 +1920,6 @@ function convertHtmlToManuscriptMarkdown(html: string) {
   return blocks.join("\n\n");
 }
 
-function hasClipboardRichMarkup(html: string) {
-  return /<h[1-6]\b|role=["']heading["']|mso-outline-level:\s*[1-6]|heading\s*[1-6]|<a\b|docs\.google\.com\/document/i.test(
-    html,
-  );
-}
-
 function getClipboardHeadingLevel(element: Element) {
   const tagName = element.tagName.toLowerCase();
   const tagMatch = tagName.match(/^h([1-6])$/);
@@ -2456,26 +2369,6 @@ function getWriterFontStack(fontFamily: TypographySettings["fontFamily"]) {
   }
 
   return '"Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif';
-}
-
-function copyTextToClipboard(value: string) {
-  if (navigator.clipboard?.writeText) {
-    navigator.clipboard.writeText(value).catch(() => fallbackCopyText(value));
-    return;
-  }
-
-  fallbackCopyText(value);
-}
-
-function fallbackCopyText(value: string) {
-  const helper = document.createElement("textarea");
-  helper.value = value;
-  helper.style.position = "fixed";
-  helper.style.left = "-9999px";
-  document.body.appendChild(helper);
-  helper.select();
-  document.execCommand("copy");
-  helper.remove();
 }
 
 async function downloadDataUrl(dataUrl: string, filename: string) {

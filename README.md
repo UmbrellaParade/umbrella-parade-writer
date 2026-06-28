@@ -1,52 +1,53 @@
 # Umbrella Parade Writer
 
-小説原稿を、Kindle電子書籍としまうまマルシェ向け紙面の両方を意識して書くための原稿ツールです。
+小説原稿をKindle電子書籍としまうまマルシェ向けに整えるための制作ツールです。
 
-## 最初のMVP
+## 方針
 
-- 横書き / 縦書きプレビュー
-- 標準 / Kindle / しまうま紙面プレビュー
-- 見出し1ベースのKindle向け目次
-- 目次クリックでプレビュー内の章へジャンプ
-- 見出し1ごとの自動改ページ
-- Undo / Redo: `Ctrl+Z`, `Ctrl+Y`, `Ctrl+Shift+Z`
-- ルビ記法 `｜文字《ふりがな》`
-- 通常の青色・下線リンク
-- 挿絵や外部QR画像の取り込み。本文には短い `asset:...` 参照だけを残し、画像本体はブラウザ内の画像ライブラリに保存
-- DOCX / EPUB / PDF 書き出し
-- タイトル入りQRコードカード作成、外部QR画像差し替え
-- QRコード枠: 記録室 / 装飾 / クラシック / ミニマル
-- ChatGPT / Claude / Gemini のAPIキーとモデル設定画面
-- Custom GPT / Gem 連携の将来用入口
+現在は2つの方向を置いています。
 
-## 開発
+- `src/`: Web版の実験UI
+- `google-docs-addon/`: Googleドキュメントを原稿エディタとして使うApps Script版
+
+原稿を書く体験はGoogleドキュメントが安定しているため、今後の本命はGoogleドキュメント拡張版です。Web版はプレビューや書き出し処理の実験場として残します。
+
+## Googleドキュメント拡張版
+
+`google-docs-addon/` にApps Script用のファイルがあります。
+
+できること:
+
+- Docs本文の読み込み
+- Kindle/しまうま向けプレビュー
+- 横書き/縦書きプレビュー
+- 見出しから目次を作成
+- 文字数、見出し数、リンク数の確認
+- ルビ記法 `｜漢字《かんじ》` の挿入
+- Kindle用リンク挿入
+- A+ 4枠の入力とプレビューPNG作成
+
+詳しい入れ方は [google-docs-addon/README.md](google-docs-addon/README.md) を参照してください。
+
+## Web版の開発
 
 ```bash
 npm install
 npm run dev
 ```
 
-Windows PowerShellで `npm.ps1` が止まる場合は、次のように実行します。
+Windows PowerShellで `npm.ps1` が止まる場合:
 
 ```bash
 npm.cmd install
 npm.cmd run dev
 ```
 
-## AIモデル既定値
+本番ビルド:
 
-2026-06-28時点で公式モデル一覧を確認し、初期値は次にしています。
-
-- OpenAI: `gpt-5.5`
-- Anthropic: `claude-fable-5-20260601`
-- Gemini: `gemini-3.5-flash`
-
-参照:
-
-- [OpenAI model docs](https://developers.openai.com/api/docs/models)
-- [Anthropic model docs](https://docs.anthropic.com/en/docs/about-claude/models/overview)
-- [Gemini model docs](https://ai.google.dev/gemini-api/docs/models)
+```bash
+npm.cmd run build
+```
 
 ## 注意
 
-APIキーは現時点ではブラウザのlocalStorageに保存します。GitHubには `.env` と `.env.*` が入らない設定です。実際にAI相談機能を呼び出す段階では、キーを守るためのローカルバックエンドか安全なプロキシを追加します。
+AI APIキーはブラウザのlocalStorageに保存する実験仕様です。実運用でAI連携を行う場合は、キーを守るためのローカルバックエンドまたは安全なプロキシを追加する予定です。
