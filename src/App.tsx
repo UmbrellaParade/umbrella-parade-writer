@@ -103,6 +103,11 @@ const defaultCoverImage: CoverImageState = {
   name: "",
 };
 
+const storageWriteErrorMessage =
+  "画像が大きすぎてブラウザに保存できません。小さめの画像にしてもう一度試してください。";
+const coverImageMaxSide = 1600;
+const aplusImageMaxSide = 1000;
+
 type ManuscriptsByChannel = Record<SalesChannel, string>;
 type ManuscriptHistory = Record<SalesChannel, string[]>;
 
@@ -118,7 +123,7 @@ function App() {
   if (!initialDraftRef.current) initialDraftRef.current = loadInitialDraft();
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("write");
-  const [title, setTitle] = useState(() => localStorage.getItem(storageKeys.title) || "Umbrella Parade Manuscript");
+  const [title, setTitle] = useState(() => readStorageValue(storageKeys.title, "Umbrella Parade Manuscript"));
   const [salesChannel, setSalesChannel] = useState<SalesChannel>(loadSalesChannel);
   const [manuscripts, setManuscripts] = useState<ManuscriptsByChannel>(initialDraftRef.current.manuscripts);
   const [imageAssets, setImageAssets] = useState<ImageAsset[]>(initialDraftRef.current.imageAssets);
@@ -181,30 +186,32 @@ function App() {
   }, [editorMode, rendered.html]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.title, title);
-    localStorage.setItem(storageKeys.manuscripts, JSON.stringify(manuscripts));
-    localStorage.setItem(storageKeys.manuscript, manuscript);
-    setStatus("保存済み");
+    const saved = [
+      writeStorageValue(storageKeys.title, title),
+      writeStorageJson(storageKeys.manuscripts, manuscripts),
+      writeStorageValue(storageKeys.manuscript, manuscript),
+    ].every(Boolean);
+    setStatus(saved ? "保存済み" : storageWriteErrorMessage);
   }, [title, manuscript, manuscripts]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.aiSettings, JSON.stringify(aiSettings));
+    if (!writeStorageJson(storageKeys.aiSettings, aiSettings)) setStatus(storageWriteErrorMessage);
   }, [aiSettings]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.imageAssets, JSON.stringify(imageAssets));
+    if (!writeStorageJson(storageKeys.imageAssets, imageAssets)) setStatus(storageWriteErrorMessage);
   }, [imageAssets]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.typography, JSON.stringify(typography));
+    if (!writeStorageJson(storageKeys.typography, typography)) setStatus(storageWriteErrorMessage);
   }, [typography]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.pageBreaks, JSON.stringify(pageBreaks));
+    if (!writeStorageJson(storageKeys.pageBreaks, pageBreaks)) setStatus(storageWriteErrorMessage);
   }, [pageBreaks]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.salesChannel, salesChannel);
+    if (!writeStorageValue(storageKeys.salesChannel, salesChannel)) setStatus(storageWriteErrorMessage);
   }, [salesChannel]);
 
   useEffect(() => {
@@ -233,11 +240,11 @@ function App() {
   }, [direction, pageBreaks.pageGuide, previewPages.length, previewTarget]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.coverImage, JSON.stringify(coverImage));
+    if (!writeStorageJson(storageKeys.coverImage, coverImage)) setStatus(storageWriteErrorMessage);
   }, [coverImage]);
 
   useEffect(() => {
-    localStorage.setItem(storageKeys.aplus, JSON.stringify(aplus));
+    if (!writeStorageJson(storageKeys.aplus, aplus)) setStatus(storageWriteErrorMessage);
   }, [aplus]);
 
   useEffect(() => {
@@ -638,9 +645,11 @@ function App() {
     if (!file || !file.type.startsWith("image/")) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
+      const source = typeof reader.result === "string" ? reader.result : "";
+      const imageSrc = await compactImageDataUrl(source, coverImageMaxSide);
       setCoverImage({
-        src: typeof reader.result === "string" ? reader.result : "",
+        src: imageSrc,
         name: file.name,
       });
       setStatus("表紙を読み込みました");
@@ -654,10 +663,13 @@ function App() {
     if (!file || !file.type.startsWith("image/")) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
-      const imageSrc = typeof reader.result === "string" ? reader.result : "";
-      updateAplusItem(itemId, "imageSrc", imageSrc);
-      updateAplusItem(itemId, "imageName", file.name);
+    reader.onload = async () => {
+      const source = typeof reader.result === "string" ? reader.result : "";
+      const imageSrc = await compactImageDataUrl(source, aplusImageMaxSide);
+      updateAplusItemFields(itemId, {
+        imageSrc,
+        imageName: file.name,
+      });
       validateAplusImageSize(imageSrc, file.name, setStatus);
       setStatus("A+画像を読み込みました");
     };
@@ -719,6 +731,13 @@ function App() {
     setAplus((current) => ({
       ...current,
       items: current.items.map((item) => (item.id === itemId ? { ...item, [field]: value } : item)),
+    }));
+  };
+
+  const updateAplusItemFields = (itemId: string, fields: Partial<AplusImageItem>) => {
+    setAplus((current) => ({
+      ...current,
+      items: current.items.map((item) => (item.id === itemId ? { ...item, ...fields } : item)),
     }));
   };
 
@@ -1782,6 +1801,78 @@ function getVisibleTextLength(html: string) {
     .replace(/\s/g, "").length;
 }
 
+function readStorageValue(key: string, fallback = "") {
+  try {
+    return localStorage.getItem(key) || fallback;
+  } catch (error) {
+    console.warn(`Unable to read ${key} from localStorage`, error);
+    return fallback;
+  }
+}
+
+function writeStorageValue(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn(`Unable to write ${key} to localStorage`, error);
+    return false;
+  }
+}
+
+function writeStorageJson(key: string, value: unknown) {
+  try {
+    return writeStorageValue(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Unable to serialize ${key} for localStorage`, error);
+    return false;
+  }
+}
+
+function compactImageDataUrl(dataUrl: string, maxSide: number, quality = 0.86): Promise<string> {
+  if (!dataUrl.startsWith("data:image/")) return Promise.resolve(dataUrl);
+
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+      if (!longestSide) {
+        resolve(dataUrl);
+        return;
+      }
+
+      const scale = Math.min(1, maxSide / longestSide);
+      if (scale === 1 && dataUrl.length < 700_000) {
+        resolve(dataUrl);
+        return;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext("2d");
+      if (!context) {
+        resolve(dataUrl);
+        return;
+      }
+
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      try {
+        const compact = canvas.toDataURL("image/jpeg", quality);
+        resolve(compact.length < dataUrl.length || dataUrl.length > 700_000 ? compact : dataUrl);
+      } catch (error) {
+        console.warn("Unable to compact image", error);
+        resolve(dataUrl);
+      }
+    };
+    image.onerror = () => resolve(dataUrl);
+    image.src = dataUrl;
+  });
+}
+
 function loadInitialDraft() {
   const storedAssets = loadImageAssets();
   const storedManuscripts = loadStoredManuscripts();
@@ -1798,8 +1889,8 @@ function loadInitialDraft() {
 }
 
 function loadStoredManuscripts(): ManuscriptsByChannel {
-  const legacyManuscript = localStorage.getItem(storageKeys.manuscript) || sampleManuscript;
-  const stored = localStorage.getItem(storageKeys.manuscripts);
+  const legacyManuscript = readStorageValue(storageKeys.manuscript, sampleManuscript);
+  const stored = readStorageValue(storageKeys.manuscripts);
   if (!stored) {
     return {
       kindle: legacyManuscript,
@@ -1822,7 +1913,7 @@ function loadStoredManuscripts(): ManuscriptsByChannel {
 }
 
 function loadImageAssets(): ImageAsset[] {
-  const stored = localStorage.getItem(storageKeys.imageAssets);
+  const stored = readStorageValue(storageKeys.imageAssets);
   if (!stored) return [];
 
   try {
@@ -2254,7 +2345,7 @@ function normalizeImageExtension(value: string): ImageAsset["extension"] {
 }
 
 function loadTypographySettings(): TypographySettings {
-  const stored = localStorage.getItem(storageKeys.typography);
+  const stored = readStorageValue(storageKeys.typography);
   if (!stored) return defaultTypography;
 
   try {
@@ -2278,7 +2369,7 @@ function loadTypographySettings(): TypographySettings {
 }
 
 function loadPageBreakSettings(): PageBreakSettings {
-  const stored = localStorage.getItem(storageKeys.pageBreaks);
+  const stored = readStorageValue(storageKeys.pageBreaks);
   if (!stored) return defaultPageBreaks;
 
   try {
@@ -2293,12 +2384,12 @@ function loadPageBreakSettings(): PageBreakSettings {
 }
 
 function loadSalesChannel(): SalesChannel {
-  const stored = localStorage.getItem(storageKeys.salesChannel);
+  const stored = readStorageValue(storageKeys.salesChannel);
   return stored === "shimauma" ? "shimauma" : "kindle";
 }
 
 function loadCoverImage(): CoverImageState {
-  const stored = localStorage.getItem(storageKeys.coverImage);
+  const stored = readStorageValue(storageKeys.coverImage);
   if (!stored) return defaultCoverImage;
 
   try {
@@ -2313,7 +2404,7 @@ function loadCoverImage(): CoverImageState {
 }
 
 function loadAplusSettings(): AplusSettings {
-  const stored = localStorage.getItem(storageKeys.aplus);
+  const stored = readStorageValue(storageKeys.aplus);
   if (!stored) return defaultAplus;
 
   try {
@@ -2408,7 +2499,7 @@ function safeDownloadName(value: string) {
 }
 
 function loadAiSettings(): AiProviderConfig[] {
-  const stored = localStorage.getItem(storageKeys.aiSettings);
+  const stored = readStorageValue(storageKeys.aiSettings);
   if (!stored) return getDefaultAiSettings();
 
   try {
