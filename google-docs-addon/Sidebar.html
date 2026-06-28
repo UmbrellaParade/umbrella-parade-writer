@@ -15,7 +15,7 @@
 
       body {
         margin: 0;
-        padding: 14px;
+        padding: 10px;
         background: #f7f3ec;
       }
 
@@ -54,7 +54,7 @@
       }
 
       h1 {
-        margin-bottom: 12px;
+        margin-bottom: 6px;
         font-size: 18px;
       }
 
@@ -87,10 +87,10 @@
       }
 
       .section {
-        margin-bottom: 14px;
+        margin-bottom: 10px;
         border: 1px solid #ddd1bf;
         border-radius: 8px;
-        padding: 12px;
+        padding: 10px;
         background: rgba(255, 253, 248, 0.92);
       }
 
@@ -103,7 +103,7 @@
       }
 
       .tabs {
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
 
       .tabs button.active,
@@ -166,7 +166,8 @@
 
       .preview-wrap {
         overflow: auto;
-        max-height: 640px;
+        max-height: calc(100vh - 210px);
+        min-height: 260px;
         padding: 10px;
         background: #e8dfd1;
       }
@@ -332,6 +333,18 @@
         color: #827360;
         font-weight: 400;
       }
+
+      .preview-toolbar {
+        display: grid;
+        gap: 8px;
+      }
+
+      .auto-sync-active {
+        border-color: #0b615c;
+        color: #0b615c;
+        background: #e7f1ed;
+        font-weight: 700;
+      }
     </style>
   </head>
   <body>
@@ -346,10 +359,12 @@
     </div>
 
     <section id="tab-preview" class="tab-panel">
-      <div class="section">
+      <div class="section preview-toolbar">
         <div class="actions">
           <button class="primary" id="refresh">Docsから更新</button>
           <button id="open-wide">大きく開く</button>
+          <button id="open-external">別画面で開く</button>
+          <button id="auto-refresh" aria-pressed="false">自動更新OFF</button>
         </div>
       </div>
 
@@ -449,6 +464,14 @@
         aplus: loadAplus(),
       };
 
+      const WRITER_URL = 'https://umbrellaparade.github.io/umbrella-parade-writer/?docsBridge=1';
+      const WRITER_ORIGIN = 'https://umbrellaparade.github.io';
+      const AUTO_REFRESH_MS = 5000;
+      let writerWindow = null;
+      let autoRefreshTimer = 0;
+      let isRefreshing = false;
+      let pendingRefresh = false;
+
       const statusEl = document.getElementById('status');
 
       document.querySelectorAll('.tabs button').forEach((button) => {
@@ -460,6 +483,7 @@
           state.target = button.dataset.target;
           updateActiveButtons('[data-target]', state.target);
           renderPreview();
+          postSnapshotToWriter();
         });
       });
 
@@ -468,11 +492,14 @@
           state.direction = button.dataset.direction;
           updateActiveButtons('[data-direction]', state.direction);
           renderPreview();
+          postSnapshotToWriter();
         });
       });
 
       document.getElementById('refresh').addEventListener('click', refreshSnapshot);
       document.getElementById('open-wide').addEventListener('click', openWidePreview);
+      document.getElementById('open-external').addEventListener('click', openExternalWriter);
+      document.getElementById('auto-refresh').addEventListener('click', toggleAutoRefresh);
       document.getElementById('read-selection').addEventListener('click', readSelection);
       document.getElementById('insert-ruby').addEventListener('click', insertRuby);
       document.getElementById('insert-link').addEventListener('click', insertLink);
@@ -507,15 +534,31 @@
         });
       }
 
-      function refreshSnapshot() {
-        setStatus('Docs本文を読み込み中...');
+      function refreshSnapshot(options) {
+        const silent = Boolean(options && options.silent);
+        if (isRefreshing) {
+          pendingRefresh = true;
+          return;
+        }
+
+        isRefreshing = true;
+        if (!silent) setStatus('Docs本文を読み込み中...');
         google.script.run
           .withSuccessHandler((snapshot) => {
+            isRefreshing = false;
             state.snapshot = snapshot;
             setStatus(`${snapshot.title} を読み込みました`);
             renderAll();
+            postSnapshotToWriter({ retry: true });
+            if (pendingRefresh) {
+              pendingRefresh = false;
+              refreshSnapshot({ silent: true });
+            }
           })
-          .withFailureHandler((error) => setStatus(error.message || '読み込みに失敗しました'))
+          .withFailureHandler((error) => {
+            isRefreshing = false;
+            setStatus(error.message || '読み込みに失敗しました');
+          })
           .getDocumentSnapshot();
       }
 
@@ -525,6 +568,68 @@
           .withSuccessHandler(() => setStatus('大きい表示を開きました'))
           .withFailureHandler((error) => setStatus(error.message || '大きい表示を開けませんでした'))
           .showWidePreview();
+      }
+
+      function openExternalWriter() {
+        writerWindow = window.open(WRITER_URL, 'umbrella-parade-writer-docs-preview');
+        if (!writerWindow) {
+          setStatus('別画面を開けませんでした。ポップアップ許可を確認してください。');
+          return;
+        }
+
+        setStatus('別画面のWriterを開きました');
+        if (state.snapshot) {
+          postSnapshotToWriter({ retry: true });
+        } else {
+          refreshSnapshot();
+        }
+        startAutoRefresh();
+      }
+
+      function toggleAutoRefresh() {
+        if (autoRefreshTimer) {
+          stopAutoRefresh();
+        } else {
+          startAutoRefresh();
+        }
+      }
+
+      function startAutoRefresh() {
+        if (autoRefreshTimer) return;
+        autoRefreshTimer = window.setInterval(() => refreshSnapshot({ silent: true }), AUTO_REFRESH_MS);
+        updateAutoRefreshButton(true);
+      }
+
+      function stopAutoRefresh() {
+        if (!autoRefreshTimer) return;
+        window.clearInterval(autoRefreshTimer);
+        autoRefreshTimer = 0;
+        updateAutoRefreshButton(false);
+      }
+
+      function updateAutoRefreshButton(active) {
+        const button = document.getElementById('auto-refresh');
+        button.textContent = active ? '自動更新ON' : '自動更新OFF';
+        button.classList.toggle('auto-sync-active', active);
+        button.setAttribute('aria-pressed', String(active));
+      }
+
+      function postSnapshotToWriter(options) {
+        if (!writerWindow || writerWindow.closed || !state.snapshot) return;
+
+        const payload = {
+          source: 'umbrella-parade-docs-addon',
+          type: 'docsSnapshot',
+          snapshot: state.snapshot,
+          target: state.target,
+          direction: state.direction,
+        };
+
+        writerWindow.postMessage(payload, WRITER_ORIGIN);
+        if (options && options.retry) {
+          window.setTimeout(() => writerWindow && !writerWindow.closed && writerWindow.postMessage(payload, WRITER_ORIGIN), 900);
+          window.setTimeout(() => writerWindow && !writerWindow.closed && writerWindow.postMessage(payload, WRITER_ORIGIN), 1800);
+        }
       }
 
       function readSelection() {

@@ -388,6 +388,18 @@ select:focus {
   gap: 14px;
 }
 
+.writer-grid.docs-bridge-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.docs-bridge-mode .preview-page {
+  min-height: 0;
+}
+
+.docs-bridge-mode .outline-panel {
+  top: 90px;
+}
+
 .control-strip {
   grid-column: 1 / -1;
   display: flex;

@@ -109,6 +109,32 @@ const aplusImageMaxSide = 1000;
 type ManuscriptsByChannel = Record<SalesChannel, string>;
 type ManuscriptHistory = Record<SalesChannel, string[]>;
 
+type DocsSnapshotSegment = {
+  text?: string;
+  url?: string;
+};
+
+type DocsSnapshotBlock = {
+  type?: string;
+  text?: string;
+  segments?: DocsSnapshotSegment[];
+  headingLevel?: number;
+};
+
+type DocsSnapshot = {
+  title?: string;
+  blocks?: DocsSnapshotBlock[];
+  updatedAt?: string;
+};
+
+type DocsBridgeMessage = {
+  source?: string;
+  type?: string;
+  snapshot?: DocsSnapshot;
+  target?: SalesChannel;
+  direction?: WritingDirection;
+};
+
 function createEmptyHistory(): ManuscriptHistory {
   return {
     kindle: [],
@@ -122,6 +148,8 @@ function App() {
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("write");
   const [title, setTitle] = useState(() => readStorageValue(storageKeys.title, "Umbrella Parade Manuscript"));
+  const [docsBridgeActive, setDocsBridgeActive] = useState(isDocsBridgeMode);
+  const [docsBridgeStatus, setDocsBridgeStatus] = useState(() => (isDocsBridgeMode() ? "Docs連携待機中" : ""));
   const [salesChannel, setSalesChannel] = useState<SalesChannel>(loadSalesChannel);
   const [manuscripts, setManuscripts] = useState<ManuscriptsByChannel>(initialDraftRef.current.manuscripts);
   const [imageAssets, setImageAssets] = useState<ImageAsset[]>(initialDraftRef.current.imageAssets);
@@ -184,13 +212,18 @@ function App() {
   }, [editorMode, rendered.html]);
 
   useEffect(() => {
+    if (docsBridgeActive) {
+      setStatus(docsBridgeStatus || "Docs連携中");
+      return;
+    }
+
     const saved = [
       writeStorageValue(storageKeys.title, title),
       writeStorageJson(storageKeys.manuscripts, manuscripts),
       writeStorageValue(storageKeys.manuscript, manuscript),
     ].every(Boolean);
     setStatus(saved ? "保存済み" : storageWriteErrorMessage);
-  }, [title, manuscript, manuscripts]);
+  }, [docsBridgeActive, docsBridgeStatus, title, manuscript, manuscripts]);
 
   useEffect(() => {
     if (!writeStorageJson(storageKeys.aiSettings, aiSettings)) setStatus(storageWriteErrorMessage);
@@ -260,6 +293,35 @@ function App() {
       cancelled = true;
     };
   }, [qrUrl]);
+
+  useEffect(() => {
+    const handleDocsBridgeMessage = (event: MessageEvent<DocsBridgeMessage>) => {
+      if (!isAllowedDocsBridgeOrigin(event.origin)) return;
+      const data = event.data;
+      if (data?.source !== "umbrella-parade-docs-addon" || data.type !== "docsSnapshot" || !data.snapshot) return;
+
+      const channel = data.target === "shimauma" ? "shimauma" : "kindle";
+      const nextDirection = data.direction === "vertical" ? "vertical" : "horizontal";
+      const nextManuscript = convertDocsSnapshotToManuscript(data.snapshot);
+      const receivedAt = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+
+      setDocsBridgeActive(true);
+      setDocsBridgeStatus(`Docsから受信 ${receivedAt}`);
+      if (data.snapshot.title) setTitle(data.snapshot.title);
+      setSalesChannel(channel);
+      setDirection(nextDirection);
+      setActiveTab("write");
+      setUndoStacks(createEmptyHistory());
+      setRedoStacks(createEmptyHistory());
+      setManuscripts((current) => ({
+        ...current,
+        [channel]: nextManuscript,
+      }));
+    };
+
+    window.addEventListener("message", handleDocsBridgeMessage);
+    return () => window.removeEventListener("message", handleDocsBridgeMessage);
+  }, []);
 
   const updateManuscript = (next: string) => {
     if (next === manuscript) return;
@@ -851,7 +913,7 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${docsBridgeActive ? "docs-bridge-mode" : ""}`}>
       <header className="topbar">
         <div className="brand-lockup">
           <BookOpen size={24} aria-hidden />
@@ -957,7 +1019,7 @@ function App() {
             )}
           </div>
 
-          <div className="status-pill">{status}</div>
+          <div className="status-pill">{docsBridgeActive ? docsBridgeStatus || status : status}</div>
 
           {rendered.images.length > 0 && (
             <div className="sidebar-image-panel" aria-label="本文画像">
@@ -975,7 +1037,11 @@ function App() {
         </aside>
 
         {activeTab === "write" && (
-          <section className="writer-grid" style={typographyStyle} aria-label="manuscript editor">
+          <section
+            className={`writer-grid ${docsBridgeActive ? "docs-bridge-grid" : ""}`}
+            style={typographyStyle}
+            aria-label="manuscript editor"
+          >
             <div className="control-strip">
               <div className="tool-buttons primary-tools" onMouseDown={(event) => event.preventDefault()}>
                 <button title="選択行を見出し1にする" onClick={applyHeadingOne}>
@@ -1116,40 +1182,44 @@ function App() {
               </div>
             </div>
 
-            <div className="editor-pane">
-              <div
-                ref={visualEditorRef}
-                className="visual-editor"
-                contentEditable
-                suppressContentEditableWarning
-                spellCheck={false}
-                aria-label="ビジュアル原稿エディタ"
-                onInput={syncVisualEditorToManuscript}
-                onPaste={handleVisualPaste}
-                onClick={handleVisualEditorClick}
-                onKeyDown={(event) => {
-                  const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
-                  const isRedo =
-                    (event.ctrlKey || event.metaKey) &&
-                    (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
-                  const isCut = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
+            {!docsBridgeActive && (
+              <div className="editor-pane">
+                <div
+                  ref={visualEditorRef}
+                  className="visual-editor"
+                  contentEditable
+                  suppressContentEditableWarning
+                  spellCheck={false}
+                  aria-label="ビジュアル原稿エディタ"
+                  onInput={syncVisualEditorToManuscript}
+                  onPaste={handleVisualPaste}
+                  onClick={handleVisualEditorClick}
+                  onKeyDown={(event) => {
+                    const isUndo =
+                      (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
+                    const isRedo =
+                      (event.ctrlKey || event.metaKey) &&
+                      (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
+                    const isCut =
+                      (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
 
-                  if (isUndo) {
-                    event.preventDefault();
-                    undoManuscript();
-                  }
+                    if (isUndo) {
+                      event.preventDefault();
+                      undoManuscript();
+                    }
 
-                  if (isRedo) {
-                    event.preventDefault();
-                    redoManuscript();
-                  }
+                    if (isRedo) {
+                      event.preventDefault();
+                      redoManuscript();
+                    }
 
-                  if (isCut) {
-                    window.setTimeout(syncVisualEditorToManuscript, 0);
-                  }
-                }}
-              />
-            </div>
+                    if (isCut) {
+                      window.setTimeout(syncVisualEditorToManuscript, 0);
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             <article
               ref={previewRef}
@@ -1718,6 +1788,56 @@ function getVisibleTextLength(html: string) {
     .replace(/<[^>]+>/g, "")
     .replace(/&[a-z#0-9]+;/gi, "あ")
     .replace(/\s/g, "").length;
+}
+
+function isDocsBridgeMode() {
+  try {
+    return new URLSearchParams(window.location.search).get("docsBridge") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedDocsBridgeOrigin(origin: string) {
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "script.google.com" || hostname === "script.googleusercontent.com" || hostname.endsWith(".googleusercontent.com");
+  } catch {
+    return false;
+  }
+}
+
+function convertDocsSnapshotToManuscript(snapshot: DocsSnapshot) {
+  const blocks = Array.isArray(snapshot.blocks) ? snapshot.blocks : [];
+  const lines = blocks.map((block) => {
+    if (block.type === "pageBreak") return "[[PAGE_BREAK]]";
+    if (block.type === "toc") return "[[TOC]]";
+
+    const text = docsSegmentsToMarkdown(block.segments, block.text || "");
+    if (block.headingLevel === 1) return `# ${text || "無題の見出し"}`;
+    if (block.headingLevel && block.headingLevel >= 2) return `## ${text || "無題の見出し"}`;
+    if (block.type === "listItem") return text ? `- ${text}` : "";
+    return text;
+  });
+
+  return lines.join("\n\n").replace(/\n{4,}/g, "\n\n\n").trim() || sampleManuscript;
+}
+
+function docsSegmentsToMarkdown(segments: DocsSnapshotSegment[] | undefined, fallback: string) {
+  const source = Array.isArray(segments) && segments.length ? segments : [{ text: fallback, url: "" }];
+  return source
+    .map((segment) => {
+      const text = String(segment.text || "");
+      const url = String(segment.url || "").trim();
+      if (!text) return "";
+      if (!/^https?:\/\//i.test(url)) return text;
+      return `[${escapeMarkdownLinkLabel(text)}](${url})`;
+    })
+    .join("");
+}
+
+function escapeMarkdownLinkLabel(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\[/g, "\\[").replace(/\]/g, "\\]");
 }
 
 function readStorageValue(key: string, fallback = "") {
