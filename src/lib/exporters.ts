@@ -105,9 +105,10 @@ function wrapXhtml(
   typography: TypographySettings,
   pageBreaks: PageBreakSettings,
 ) {
-  const pageBreakCss = pageBreaks.chapterHead
-    ? ".manual-page-break, .chapter-page-break { break-before: page; page-break-before: always; height: 0; overflow: hidden; } h1.chapter-start:not(:first-child) { break-before: page; page-break-before: always; }"
-    : ".manual-page-break, .chapter-page-break { display: none; }";
+  const automaticHeadingBreakCss = pageBreaks.chapterHead
+    ? "h1.chapter-start:not(:first-child) { break-before: page; page-break-before: always; }"
+    : "";
+  const pageBreakCss = `.manual-page-break, .chapter-page-break { break-before: page; page-break-before: always; height: 0; overflow: hidden; } ${automaticHeadingBreakCss}`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -171,7 +172,7 @@ async function createDocxChildren(
     const image = parseMarkdownImageLine(line, undefined, rendered.images);
 
     if (/^\[\[(PAGE_BREAK|CHAPTER_BREAK)\]\]$/i.test(line.trim())) {
-      pendingPageBreak = pageBreaks.chapterHead;
+      pendingPageBreak = true;
       continue;
     }
 

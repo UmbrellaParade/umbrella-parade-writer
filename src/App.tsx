@@ -1131,7 +1131,7 @@ function App() {
                       }))
                     }
                   />
-                  改ページ反映
+                  章見出しをページ頭へ
                 </label>
                 <label className="toggle-control">
                   <input
@@ -1552,7 +1552,7 @@ function paginatePreviewHtml(
   typography: TypographySettings,
   direction: WritingDirection,
   target: SalesChannel,
-  reflectManualBreaks: boolean,
+  reflectHeadingBreaks: boolean,
 ): PreviewPage[] {
   const queue = html
     .split("\n")
@@ -1579,11 +1579,11 @@ function paginatePreviewHtml(
     if (!block) continue;
 
     if (block.includes('data-page-break="true"') || block.includes('data-chapter-break="true"')) {
-      if (reflectManualBreaks) flushPage();
+      flushPage();
       continue;
     }
 
-    if (reflectManualBreaks && block.includes('data-chapter-start="true"')) {
+    if (reflectHeadingBreaks && block.includes('data-chapter-start="true"')) {
       flushPage();
     }
 
