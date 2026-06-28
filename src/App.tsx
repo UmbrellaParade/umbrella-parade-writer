@@ -364,6 +364,45 @@ function App() {
     }
   };
 
+  const insertVisualPageBreak = () => {
+    const visualEditor = visualEditorRef.current;
+    if (!visualEditor) return;
+
+    visualEditor.focus();
+    ensureSelectionInside(visualEditor);
+    const block = getSelectedVisualBlock(visualEditor);
+    const breakElement = document.createElement("div");
+    breakElement.className = "manual-page-break";
+    breakElement.dataset.pageBreak = "true";
+    breakElement.setAttribute("role", "separator");
+    breakElement.textContent = "改ページ";
+
+    if (block) {
+      block.before(breakElement);
+    } else {
+      visualEditor.append(breakElement);
+    }
+
+    syncVisualEditorToManuscript();
+  };
+
+  const insertBeforeTextSelection = (value: string) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const scrollTop = editor.scrollTop;
+    const selected = manuscript.slice(start, end);
+    const next = `${manuscript.slice(0, start)}${value}${selected}${manuscript.slice(end)}`;
+    updateManuscript(next);
+    window.requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(start + value.length, end + value.length);
+      editor.scrollTop = scrollTop;
+    });
+  };
+
   const insertAtSelection = (value: string, selectOffset = 0) => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -535,12 +574,12 @@ function App() {
 
   const insertPageBreak = () => {
     if (editorMode === "visual") {
-      insertVisualHtml('<div class="manual-page-break" data-page-break="true" role="separator">改ページ</div><p><br /></p>');
+      insertVisualPageBreak();
       setStatus("改ページを挿入しました");
       return;
     }
 
-    insertAtSelection("\n\n[[PAGE_BREAK]]\n\n");
+    insertBeforeTextSelection("\n\n[[PAGE_BREAK]]\n\n");
     setStatus("改ページを挿入しました");
   };
 
@@ -752,6 +791,28 @@ function App() {
     }
   };
 
+  const focusPreviewHeading = (heading: HTMLElement) => {
+    const preview = previewRef.current;
+    if (!preview) return;
+
+    preview.querySelectorAll(".jump-highlight").forEach((element) => {
+      element.classList.remove("jump-highlight");
+    });
+    heading.classList.add("jump-highlight");
+
+    const sheet = heading.closest<HTMLElement>(".preview-sheet");
+    if (sheet) {
+      const previewRect = preview.getBoundingClientRect();
+      const sheetRect = sheet.getBoundingClientRect();
+      const nextLeft = preview.scrollLeft + sheetRect.left - previewRect.left - 12;
+      preview.scrollTo({ left: Math.max(0, nextLeft), top: 0, behavior: "smooth" });
+    } else {
+      heading.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+    }
+
+    window.setTimeout(() => heading.classList.remove("jump-highlight"), 1800);
+  };
+
   const jumpToHeading = (id: string) => {
     setActiveTab("write");
     setActiveHeadingId(id);
@@ -762,13 +823,8 @@ function App() {
       const heading = headings.find((element) => element.id === id);
       if (!heading) return;
 
-      previewRef.current?.querySelectorAll(".jump-highlight").forEach((element) => {
-        element.classList.remove("jump-highlight");
-      });
-      heading.classList.add("jump-highlight");
-      heading.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      focusPreviewHeading(heading);
       window.history.replaceState(null, "", `#${id}`);
-      window.setTimeout(() => heading.classList.remove("jump-highlight"), 1800);
     }, 40);
   };
 
@@ -1472,7 +1528,7 @@ function paginatePreviewHtml(
   target: SalesChannel,
   reflectManualBreaks: boolean,
 ): PreviewPage[] {
-  const blocks = html
+  const queue = html
     .split("\n")
     .map((block) => block.trim())
     .filter(Boolean)
@@ -1492,10 +1548,13 @@ function paginatePreviewHtml(
     currentUnits = 0;
   };
 
-  blocks.forEach((block) => {
+  while (queue.length) {
+    const block = queue.shift() || "";
+    if (!block) continue;
+
     if (block.includes('data-page-break="true"') || block.includes('data-chapter-break="true"')) {
       if (reflectManualBreaks) flushPage();
-      return;
+      continue;
     }
 
     if (reflectManualBreaks && block.includes('data-chapter-start="true"')) {
@@ -1504,12 +1563,33 @@ function paginatePreviewHtml(
 
     const blockUnits = estimatePreviewBlockUnits(block, typography, direction, target);
     if (currentBlocks.length && currentUnits + blockUnits > capacity) {
+      const remainingUnits = Math.max(0, capacity - currentUnits);
+      const fragments = splitPreviewBlockForUnits(block, remainingUnits, typography, direction, target);
+      if (fragments.length > 1) {
+        const firstUnits = estimatePreviewBlockUnits(fragments[0], typography, direction, target);
+        if (firstUnits <= remainingUnits + 0.25) {
+          currentBlocks.push(fragments[0]);
+          flushPage();
+          queue.unshift(...fragments.slice(1));
+          continue;
+        }
+      }
+
       flushPage();
     }
 
+    const nextBlockUnits = estimatePreviewBlockUnits(block, typography, direction, target);
+    if (!currentBlocks.length && nextBlockUnits > capacity) {
+      const fragments = splitPreviewBlockForUnits(block, capacity, typography, direction, target);
+      if (fragments.length > 1) {
+        queue.unshift(...fragments);
+        continue;
+      }
+    }
+
     currentBlocks.push(block);
-    currentUnits += blockUnits;
-  });
+    currentUnits += nextBlockUnits;
+  }
 
   flushPage();
   return pages.length ? pages : [{ html: "", pageNumber: 1 }];
@@ -1559,7 +1639,7 @@ function estimatePreviewBlockUnits(
   const lines = Math.max(1, Math.ceil(textLength / charsPerLine));
   if (/^<h1\b/.test(block)) return target === "kindle" ? lines + 1.8 : lines + 2.8;
   if (/^<h2\b/.test(block)) return target === "kindle" ? lines + 1.2 : lines + 1.8;
-  return target === "kindle" ? lines + 0.25 : lines + 0.7;
+  return target === "kindle" ? lines + 0.85 : lines + 0.95;
 }
 
 function getPreviewCharsPerLine(
@@ -1593,8 +1673,21 @@ function splitPreviewBlock(
   const units = estimatePreviewBlockUnits(block, typography, direction, target);
   if (units <= capacity) return [block];
 
+  return splitPreviewBlockForUnits(block, capacity, typography, direction, target);
+}
+
+function splitPreviewBlockForUnits(
+  block: string,
+  availableUnits: number,
+  typography: TypographySettings,
+  direction: WritingDirection,
+  target: SalesChannel,
+) {
+  if (!/^<p\b/i.test(block) || availableUnits < 2) return [block];
+
   const charsPerLine = getPreviewCharsPerLine(typography, direction, target);
-  const maxChars = Math.max(charsPerLine * 4, Math.floor(charsPerLine * Math.max(1, capacity - 1)));
+  const usableUnits = Math.max(1, availableUnits - (target === "kindle" ? 1.25 : 1.5));
+  const maxChars = Math.max(charsPerLine * 2, Math.floor(charsPerLine * usableUnits));
   const fragments = splitParagraphBlock(block, maxChars);
   return fragments.length ? fragments : [block];
 }
@@ -1955,6 +2048,17 @@ function isGoogleDocsHeadingLink(href: string) {
   return /docs\.google\.com\/document|#heading=|heading=h\.|heading\./i.test(href);
 }
 
+function isVisuallyEmptyBlock(element: Element) {
+  const text = element.textContent?.replace(/\u00a0/g, " ").trim() || "";
+  if (text) return false;
+  return Array.from(element.childNodes).every((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return !(node.textContent || "").trim();
+    if (node.nodeType !== Node.ELEMENT_NODE) return true;
+    const child = node as Element;
+    return child.tagName.toLowerCase() === "br";
+  });
+}
+
 function convertVisualEditorToManuscript(root: HTMLElement, imageAssets: ImageAsset[]) {
   const blocks: string[] = [];
 
@@ -1977,6 +2081,11 @@ function convertVisualEditorToManuscript(root: HTMLElement, imageAssets: ImageAs
 
     if (element.matches(".chapter-page-break,[data-chapter-break='true']")) {
       appendBlock("[[CHAPTER_BREAK]]");
+      return;
+    }
+
+    if (element.matches(".blank-line,[data-blank-line='true']")) {
+      appendBlock("[[BLANK_LINE]]");
       return;
     }
 
@@ -2006,6 +2115,11 @@ function convertVisualEditorToManuscript(root: HTMLElement, imageAssets: ImageAs
     }
 
     if (tagName === "p" || tagName === "div" || tagName === "li") {
+      if (isVisuallyEmptyBlock(element)) {
+        appendBlock("[[BLANK_LINE]]");
+        return;
+      }
+
       appendBlock(serializeInlineNodes(Array.from(element.childNodes)));
       return;
     }

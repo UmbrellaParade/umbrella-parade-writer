@@ -5,6 +5,7 @@ const headingTwo = /^##\s+(.+)$/;
 const inlineTocMarker = /^\[\[TOC\]\]$/i;
 const pageBreakMarker = /^\[\[PAGE_BREAK\]\]$/i;
 const chapterBreakMarker = /^\[\[CHAPTER_BREAK\]\]$/i;
+const blankLineMarker = /^\[\[BLANK_LINE\]\]$/i;
 const imageLine = /^!\[([^\]]*)\]\((asset:[A-Za-z0-9_-]+|data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
 
 export const sampleManuscript = `# 第一章　傘の下の約束
@@ -63,6 +64,12 @@ export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = [
     if (chapterBreakMarker.test(line.trim())) {
       flushParagraph();
       htmlBlocks.push(`<div class="chapter-page-break" data-chapter-break="true" aria-hidden="true"></div>`);
+      return;
+    }
+
+    if (blankLineMarker.test(line.trim())) {
+      flushParagraph();
+      htmlBlocks.push(`<div class="blank-line" data-blank-line="true" aria-hidden="true"></div>`);
       return;
     }
 
