@@ -896,11 +896,6 @@ function App() {
                   }}
                 />
               </div>
-              <div
-                className={`editor-visual ${direction}`}
-                onClick={handlePreviewClick}
-                dangerouslySetInnerHTML={{ __html: rendered.html }}
-              />
             </div>
 
             <article

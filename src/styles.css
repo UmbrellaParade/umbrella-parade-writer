@@ -448,13 +448,13 @@ select:focus {
 }
 
 .editor-pane {
-  display: grid;
-  grid-template-rows: minmax(220px, 1fr) minmax(180px, 0.82fr);
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
   padding: 10px;
 }
 
 .source-editor {
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   border: 1px solid #e0d5c7;
@@ -475,20 +475,6 @@ select:focus {
   font-family: var(--writer-font-family);
   font-size: var(--writer-font-size);
   background: transparent;
-}
-
-.editor-visual {
-  min-height: 0;
-  overflow: auto;
-  border: 1px solid #e0d5c7;
-  border-radius: 8px;
-  padding: 22px;
-  font-family: var(--writer-font-family);
-  font-size: var(--writer-font-size);
-  line-height: 2;
-  color: #151311;
-  background: #fffdfa;
-  scroll-behavior: smooth;
 }
 
 .preview-page {
@@ -514,6 +500,21 @@ select:focus {
   align-content: start;
   min-height: 100%;
   padding: 18px;
+}
+
+.preview-page.vertical.show-page-guides {
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+}
+
+.preview-page.vertical.show-page-guides .preview-page-list {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-width: max-content;
+  min-height: 100%;
+  gap: 14px;
 }
 
 .preview-sheet {
@@ -566,16 +567,12 @@ select:focus {
   max-width: 100%;
 }
 
-.editor-visual h1,
-.editor-visual h2,
-.editor-visual p,
 .preview-page h1,
 .preview-page h2,
 .preview-page p {
   margin-top: 0;
 }
 
-.editor-visual h1,
 .preview-page h1 {
   font-size: 1.5rem;
   font-weight: 700;
@@ -587,7 +584,6 @@ select:focus {
     box-shadow 180ms ease;
 }
 
-.editor-visual h2,
 .preview-page h2 {
   font-size: 1.14rem;
   font-weight: 700;
@@ -595,35 +591,29 @@ select:focus {
   margin-block-end: 24px;
 }
 
-.editor-visual p,
 .preview-page p {
   margin-bottom: 0;
   margin-block-end: 1.4em;
 }
 
-.editor-visual ruby rt,
 .preview-page ruby rt {
   font-size: 0.5em;
   color: #201b16;
 }
 
-.editor-visual .inline-size-small,
 .preview-page .inline-size-small {
   font-size: 0.86em;
 }
 
-.editor-visual .inline-size-large,
 .preview-page .inline-size-large {
   font-size: 1.18em;
 }
 
-.editor-visual .jump-highlight,
 .preview-page .jump-highlight {
   background: rgba(255, 218, 112, 0.34);
   box-shadow: 0 0 0 8px rgba(255, 218, 112, 0.2);
 }
 
-.editor-visual .manual-page-break,
 .preview-page .manual-page-break {
   margin: 28px 0;
   border-block-start: 1px dashed #b7a58f;
@@ -636,19 +626,16 @@ select:focus {
   text-align: center;
 }
 
-.editor-visual .chapter-page-break,
 .preview-page .chapter-page-break {
   display: none;
 }
 
-.editor-visual .manuscript-image,
 .preview-page .manuscript-image {
   margin: 28px 0;
   text-align: center;
   writing-mode: horizontal-tb;
 }
 
-.editor-visual .manuscript-image img,
 .preview-page .manuscript-image img {
   display: inline-block;
   max-width: 100%;
@@ -657,7 +644,6 @@ select:focus {
   border-radius: 6px;
 }
 
-.editor-visual .manuscript-image figcaption,
 .preview-page .manuscript-image figcaption {
   margin-top: 8px;
   font-family:
@@ -666,47 +652,38 @@ select:focus {
   color: #6b5b48;
 }
 
-.editor-visual .manuscript-toc,
 .preview-page .manuscript-toc {
   margin: 0 0 2em;
   padding: 0;
   writing-mode: inherit;
 }
 
-.editor-visual .manuscript-toc h2,
 .preview-page .manuscript-toc h2 {
   margin-bottom: 0.8em;
 }
 
-.editor-visual .manuscript-toc ol,
 .preview-page .manuscript-toc ol {
   margin: 0;
   padding-inline-start: 1.5em;
 }
 
-.editor-visual .manuscript-toc li,
 .preview-page .manuscript-toc li {
   margin-bottom: 0.35em;
 }
 
-.editor-visual .manuscript-toc .toc-level-2,
 .preview-page .manuscript-toc .toc-level-2 {
   margin-inline-start: 1em;
 }
 
-.editor-visual .manuscript-toc a,
 .preview-page .manuscript-toc a {
   color: #0b61d8;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-.preview-page.vertical {
+.preview-page:not(.show-page-guides).vertical {
   writing-mode: vertical-rl;
   text-orientation: mixed;
-}
-
-.preview-page:not(.show-page-guides).vertical {
   padding: 36px 42px;
 }
 
@@ -1132,8 +1109,7 @@ select:focus {
   }
 
   .preview-page:not(.show-page-guides),
-  .source-editor textarea,
-  .editor-visual {
+  .source-editor textarea {
     padding: 20px;
   }
 
