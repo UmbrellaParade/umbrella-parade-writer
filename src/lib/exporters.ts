@@ -1,39 +1,19 @@
-import { Document, HeadingLevel, Packer, Paragraph, TextRun } from "docx";
+import { AlignmentType, Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } from "docx";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import type { RenderedManuscript, TocItem } from "../types";
-import { createKindleNav, escapeHtml, stripMarkupForDocx } from "./manuscript";
+import {
+  createKindleNav,
+  dataUrlToBytes,
+  escapeHtml,
+  parseMarkdownImageLine,
+  stripMarkupForDocx,
+} from "./manuscript";
 
 export async function exportDocx(markdown: string, title: string) {
-  const children = markdown
-    .replace(/\r\n/g, "\n")
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      if (line.startsWith("# ")) {
-        return new Paragraph({
-          heading: HeadingLevel.HEADING_1,
-          spacing: { before: 480, after: 240 },
-          children: [new TextRun(stripMarkupForDocx(line.replace(/^#\s+/, "")))],
-        });
-      }
-
-      if (line.startsWith("## ")) {
-        return new Paragraph({
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 360, after: 180 },
-          children: [new TextRun(stripMarkupForDocx(line.replace(/^##\s+/, "")))],
-        });
-      }
-
-      return new Paragraph({
-        spacing: { line: 360, after: 160 },
-        children: [new TextRun(stripMarkupForDocx(line))],
-      });
-    });
+  const children = await createDocxChildren(markdown);
 
   const doc = new Document({
     sections: [
@@ -66,6 +46,14 @@ export async function exportPdf(previewElement: HTMLElement, title: string) {
 
 export async function exportEpub(rendered: RenderedManuscript, title: string) {
   const zip = new JSZip();
+  let contentHtml = rendered.html;
+
+  rendered.images.forEach((image) => {
+    const path = `images/${image.id}.${image.extension}`;
+    contentHtml = contentHtml.replaceAll(image.src, path);
+    zip.file(`OEBPS/${path}`, dataUrlToBytes(image.src));
+  });
+
   zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
   zip.file(
     "META-INF/container.xml",
@@ -77,9 +65,9 @@ export async function exportEpub(rendered: RenderedManuscript, title: string) {
 </container>`,
   );
 
-  zip.file("OEBPS/content.xhtml", wrapXhtml(title, rendered.html));
+  zip.file("OEBPS/content.xhtml", wrapXhtml(title, contentHtml));
   zip.file("OEBPS/nav.xhtml", createNavXhtml(title, rendered.toc));
-  zip.file("OEBPS/content.opf", createOpf(title));
+  zip.file("OEBPS/content.opf", createOpf(title, rendered));
 
   const blob = await zip.generateAsync({
     type: "blob",
@@ -99,7 +87,10 @@ function wrapXhtml(title: string, body: string) {
     <style>
       body { font-family: serif; line-height: 1.8; }
       a { color: #0b61d8; text-decoration: underline; }
-      h1 { break-before: page; font-size: 1.5em; }
+      h1 { break-before: page; page-break-before: always; font-size: 1.5em; }
+      figure { margin: 1.5em 0; text-align: center; }
+      figure img { max-width: 100%; height: auto; }
+      figcaption { font-size: 0.85em; color: #555; }
       ruby rt { font-size: 0.5em; }
     </style>
   </head>
@@ -126,7 +117,97 @@ function createNavXhtml(title: string, toc: TocItem[]) {
 </html>`;
 }
 
-function createOpf(title: string) {
+async function createDocxChildren(markdown: string) {
+  const children: Paragraph[] = [];
+  let seenHeadingOne = false;
+
+  for (const line of markdown
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((value) => value.trimEnd())
+    .filter((value) => value.length > 0)) {
+    const image = parseMarkdownImageLine(line);
+
+    if (image?.src.startsWith("data:image/")) {
+      const size = await getDataImageSize(image.src);
+      const maxWidth = 420;
+      const scale = Math.min(1, maxWidth / size.width);
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 240, after: 240 },
+          children: [
+            new ImageRun({
+              type: image.extension,
+              data: dataUrlToBytes(image.src),
+              transformation: {
+                width: Math.round(size.width * scale),
+                height: Math.round(size.height * scale),
+              },
+              altText: {
+                name: image.alt || image.id,
+                title: image.alt || image.id,
+                description: image.alt || image.id,
+              },
+            }),
+          ],
+        }),
+      );
+      continue;
+    }
+
+    if (line.startsWith("# ")) {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_1,
+          pageBreakBefore: seenHeadingOne,
+          spacing: { before: seenHeadingOne ? 0 : 480, after: 240 },
+          children: [new TextRun(stripMarkupForDocx(line.replace(/^#\s+/, "")))],
+        }),
+      );
+      seenHeadingOne = true;
+      continue;
+    }
+
+    if (line.startsWith("## ")) {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 360, after: 180 },
+          children: [new TextRun(stripMarkupForDocx(line.replace(/^##\s+/, "")))],
+        }),
+      );
+      continue;
+    }
+
+    children.push(
+      new Paragraph({
+        spacing: { line: 360, after: 160 },
+        children: [new TextRun(stripMarkupForDocx(line))],
+      }),
+    );
+  }
+
+  return children;
+}
+
+function getDataImageSize(src: string) {
+  return new Promise<{ width: number; height: number }>((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve({ width: image.naturalWidth || 420, height: image.naturalHeight || 420 });
+    image.onerror = () => resolve({ width: 420, height: 420 });
+    image.src = src;
+  });
+}
+
+function createOpf(title: string, rendered: RenderedManuscript) {
+  const imageItems = rendered.images
+    .map(
+      (image) =>
+        `<item id="${image.id}" href="images/${image.id}.${image.extension}" media-type="${image.mimeType}"/>`,
+    )
+    .join("\n    ");
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -137,6 +218,7 @@ function createOpf(title: string) {
   <manifest>
     <item id="content" href="content.xhtml" media-type="application/xhtml+xml"/>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    ${imageItems}
   </manifest>
   <spine>
     <itemref idref="content"/>

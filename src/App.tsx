@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import html2canvas from "html2canvas";
 import { saveAs } from "file-saver";
 import {
@@ -6,11 +7,14 @@ import {
   Download,
   FileText,
   Heading1,
+  ImageIcon,
   Link,
   QrCode,
   Settings,
   Sparkles,
   Type,
+  Upload,
+  X,
 } from "lucide-react";
 import QRCode from "qrcode";
 import { AI_PROVIDERS, getDefaultAiSettings } from "./data/aiModels";
@@ -41,13 +45,18 @@ function App() {
   const [qrSubtitle, setQrSubtitle] = useState("ヴェル13世×カーラ・マンソン デュエットver");
   const [qrFrame, setQrFrame] = useState("ornament");
   const [qrDataUrl, setQrDataUrl] = useState("");
+  const [externalQrDataUrl, setExternalQrDataUrl] = useState("");
+  const [activeHeadingId, setActiveHeadingId] = useState("");
   const [aiSettings, setAiSettings] = useState<AiProviderConfig[]>(loadAiSettings);
   const [status, setStatus] = useState("保存済み");
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLElement>(null);
   const qrCardRef = useRef<HTMLDivElement>(null);
+  const manuscriptImageInputRef = useRef<HTMLInputElement>(null);
+  const qrImageInputRef = useRef<HTMLInputElement>(null);
 
   const rendered = useMemo(() => renderManuscript(manuscript), [manuscript]);
+  const qrImageSrc = externalQrDataUrl || qrDataUrl;
 
   useEffect(() => {
     localStorage.setItem(storageKeys.title, title);
@@ -89,7 +98,31 @@ function App() {
     });
   };
 
-  const addHeading = () => insertAtSelection("\n# 新しい章\n\n");
+  const applyHeadingOne = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const lineStart = start === end ? manuscript.lastIndexOf("\n", Math.max(0, start - 1)) + 1 : start;
+    const nextBreak = manuscript.indexOf("\n", end);
+    const lineEnd = start === end ? (nextBreak === -1 ? manuscript.length : nextBreak) : end;
+    const selected = manuscript.slice(lineStart, lineEnd);
+    const replacement = selected
+      .split("\n")
+      .map((line) => {
+        if (!line.trim()) return line;
+        const leading = line.match(/^\s*/)?.[0] || "";
+        return `${leading}# ${line.replace(/^\s*#{1,6}\s*/, "").trimStart()}`;
+      })
+      .join("\n");
+
+    setManuscript(`${manuscript.slice(0, lineStart)}${replacement}${manuscript.slice(lineEnd)}`);
+    window.requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(lineStart, lineStart + replacement.length);
+    });
+  };
 
   const addRuby = () => {
     const editor = editorRef.current;
@@ -107,6 +140,34 @@ function App() {
     const url = window.prompt("URL", "https://");
     if (!url) return;
     insertAtSelection(`[${label}](${url})`);
+  };
+
+  const insertManuscriptImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const imageSource = typeof reader.result === "string" ? reader.result : "";
+      const alt = file.name.replace(/\.[^.]+$/, "");
+      insertAtSelection(`\n\n![${alt}](${imageSource})\n\n`);
+      setStatus("画像を挿入しました");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const importQrImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    event.currentTarget.value = "";
+    if (!file || !file.type.startsWith("image/")) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setExternalQrDataUrl(typeof reader.result === "string" ? reader.result : "");
+      setStatus("外部QR画像を読み込みました");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleExportDocx = async () => {
@@ -140,6 +201,25 @@ function App() {
     setAiSettings((current) =>
       current.map((item) => (item.key === providerKey ? { ...item, [field]: value } : item)),
     );
+  };
+
+  const jumpToHeading = (id: string) => {
+    setActiveTab("write");
+    setActiveHeadingId(id);
+
+    window.setTimeout(() => {
+      const headings = Array.from(previewRef.current?.querySelectorAll<HTMLElement>("[id]") || []);
+      const heading = headings.find((element) => element.id === id);
+      if (!heading) return;
+
+      previewRef.current?.querySelectorAll(".jump-highlight").forEach((element) => {
+        element.classList.remove("jump-highlight");
+      });
+      heading.classList.add("jump-highlight");
+      heading.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      window.history.replaceState(null, "", `#${id}`);
+      window.setTimeout(() => heading.classList.remove("jump-highlight"), 1800);
+    }, 40);
   };
 
   return (
@@ -200,7 +280,15 @@ function App() {
             <p className="panel-title">目次</p>
             {rendered.toc.length ? (
               rendered.toc.map((item) => (
-                <a key={item.id} className={`toc-link level-${item.level}`} href={`#${item.id}`}>
+                <a
+                  key={item.id}
+                  className={`toc-link level-${item.level} ${activeHeadingId === item.id ? "active" : ""}`}
+                  href={`#${item.id}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    jumpToHeading(item.id);
+                  }}
+                >
                   {item.title}
                 </a>
               ))
@@ -215,6 +303,28 @@ function App() {
         {activeTab === "write" && (
           <section className="writer-grid" aria-label="manuscript editor">
             <div className="control-strip">
+              <div className="tool-buttons primary-tools">
+                <button title="選択行を見出し1にする" onClick={applyHeadingOne}>
+                  <Heading1 size={17} aria-hidden />
+                </button>
+                <button title="ルビを振る" onClick={addRuby}>
+                  <Type size={17} aria-hidden />
+                </button>
+                <button title="リンクに変換" onClick={addLink}>
+                  <Link size={17} aria-hidden />
+                </button>
+                <button title="画像を挿入" onClick={() => manuscriptImageInputRef.current?.click()}>
+                  <ImageIcon size={17} aria-hidden />
+                </button>
+                <input
+                  ref={manuscriptImageInputRef}
+                  className="visually-hidden"
+                  type="file"
+                  accept="image/*"
+                  onChange={insertManuscriptImage}
+                />
+              </div>
+
               <div className="segmented">
                 <button className={direction === "horizontal" ? "active" : ""} onClick={() => setDirection("horizontal")}>
                   横書き
@@ -236,17 +346,6 @@ function App() {
                 ))}
               </div>
 
-              <div className="tool-buttons">
-                <button title="見出し1を追加" onClick={addHeading}>
-                  <Heading1 size={17} aria-hidden />
-                </button>
-                <button title="ルビを振る" onClick={addRuby}>
-                  <Type size={17} aria-hidden />
-                </button>
-                <button title="リンクに変換" onClick={addLink}>
-                  <Link size={17} aria-hidden />
-                </button>
-              </div>
             </div>
 
             <div className="editor-pane">
@@ -277,6 +376,26 @@ function App() {
               </label>
               <input id="qr-url" value={qrUrl} onChange={(event) => setQrUrl(event.target.value)} />
 
+              <input
+                ref={qrImageInputRef}
+                className="visually-hidden"
+                type="file"
+                accept="image/*"
+                onChange={importQrImage}
+              />
+              <div className="inline-actions">
+                <button className="secondary-action" onClick={() => qrImageInputRef.current?.click()}>
+                  <Upload size={16} aria-hidden />
+                  外部QR画像
+                </button>
+                {externalQrDataUrl && (
+                  <button className="secondary-action" onClick={() => setExternalQrDataUrl("")}>
+                    <X size={16} aria-hidden />
+                    生成QRに戻す
+                  </button>
+                )}
+              </div>
+
               <label className="field-label" htmlFor="qr-title">
                 タイトル
               </label>
@@ -291,6 +410,7 @@ function App() {
                 外枠
               </label>
               <select id="qr-frame" value={qrFrame} onChange={(event) => setQrFrame(event.target.value)}>
+                <option value="archive">記録室</option>
                 <option value="ornament">装飾</option>
                 <option value="classic">クラシック</option>
                 <option value="minimal">ミニマル</option>
@@ -307,7 +427,13 @@ function App() {
               <span className="corner top-right" />
               <span className="corner bottom-left" />
               <span className="corner bottom-right" />
-              {qrDataUrl && <img src={qrDataUrl} alt="" />}
+              {qrFrame === "archive" && (
+                <>
+                  <span className="archive-line top" />
+                  <span className="archive-line bottom" />
+                </>
+              )}
+              {qrImageSrc && <img src={qrImageSrc} alt="" />}
               <h2>{qrTitle}</h2>
               <p>{qrSubtitle}</p>
             </div>

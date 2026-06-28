@@ -15,6 +15,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  scroll-behavior: smooth;
   background:
     linear-gradient(90deg, rgba(22, 95, 91, 0.08), transparent 34%),
     linear-gradient(180deg, #fbfaf7 0%, #eee8df 100%);
@@ -225,11 +226,20 @@ select:focus {
   display: block;
   line-height: 1.45;
   font-size: 0.9rem;
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin-inline: -6px;
 }
 
 .toc-link.level-2 {
-  padding-left: 16px;
+  padding-left: 22px;
   font-size: 0.82rem;
+}
+
+.toc-link.active {
+  background: rgba(11, 97, 92, 0.12);
+  color: #0a514d;
+  font-weight: 700;
 }
 
 .muted {
@@ -249,9 +259,13 @@ select:focus {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.primary-tools {
+  padding-right: 4px;
 }
 
 .editor-pane,
@@ -283,6 +297,7 @@ select:focus {
     "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
   line-height: 2;
   color: #151311;
+  scroll-behavior: smooth;
 }
 
 .preview-page h1,
@@ -295,6 +310,17 @@ select:focus {
   font-size: 1.5rem;
   margin-bottom: 32px;
   break-before: page;
+  page-break-before: always;
+  scroll-margin-block-start: 28px;
+  transition:
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.preview-page h1.chapter-heading:not(:first-of-type) {
+  margin-top: 72px;
+  padding-top: 36px;
+  border-top: 1px dashed #c9bcaa;
 }
 
 .preview-page h2 {
@@ -309,6 +335,33 @@ select:focus {
 .preview-page ruby rt {
   font-size: 0.5em;
   color: #201b16;
+}
+
+.preview-page .jump-highlight {
+  background: rgba(255, 218, 112, 0.34);
+  box-shadow: 0 0 0 8px rgba(255, 218, 112, 0.2);
+}
+
+.preview-page .manuscript-image {
+  margin: 28px 0;
+  text-align: center;
+  writing-mode: horizontal-tb;
+}
+
+.preview-page .manuscript-image img {
+  display: inline-block;
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.preview-page .manuscript-image figcaption {
+  margin-top: 8px;
+  font-family:
+    "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
+  font-size: 0.82rem;
+  color: #6b5b48;
 }
 
 .preview-page.vertical {
@@ -343,6 +396,34 @@ select:focus {
   padding: 18px;
   display: grid;
   gap: 12px;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.secondary-action {
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .primary-action {
@@ -428,6 +509,85 @@ select:focus {
 .qr-card.classic {
   border-width: 6px;
   box-shadow: inset 0 0 0 10px #fff, inset 0 0 0 12px #111;
+}
+
+.qr-card.archive {
+  border-width: 4px;
+  padding: clamp(42px, 6vw, 72px);
+  box-shadow:
+    inset 0 0 0 14px #fff,
+    inset 0 0 0 16px #111,
+    inset 0 0 0 24px #fff;
+}
+
+.qr-card.archive::before,
+.qr-card.archive::after {
+  position: absolute;
+  left: 50%;
+  width: min(58%, 410px);
+  height: 24px;
+  transform: translateX(-50%);
+  color: #111;
+  font-size: 24px;
+  line-height: 20px;
+  text-align: center;
+  background: linear-gradient(90deg, #111 0 44%, transparent 44% 56%, #111 56% 100%);
+  background-size: 100% 2px;
+  background-position: center;
+  background-repeat: no-repeat;
+  content: "◆";
+  z-index: 1;
+}
+
+.qr-card.archive::before {
+  top: 18px;
+}
+
+.qr-card.archive::after {
+  bottom: 18px;
+}
+
+.qr-card.archive .archive-line {
+  position: absolute;
+  left: 50%;
+  width: min(84%, 570px);
+  height: 1px;
+  transform: translateX(-50%);
+  background: #111;
+}
+
+.qr-card.archive .archive-line.top {
+  top: 58px;
+}
+
+.qr-card.archive .archive-line.bottom {
+  bottom: 58px;
+}
+
+.qr-card.archive .corner {
+  width: 112px;
+  height: 112px;
+  border-width: 5px;
+}
+
+.qr-card.archive .top-left {
+  top: 22px;
+  border-width: 5px 0 0 5px;
+}
+
+.qr-card.archive .top-right {
+  top: 22px;
+  border-width: 5px 5px 0 0;
+}
+
+.qr-card.archive .bottom-left {
+  bottom: 22px;
+  border-width: 0 0 5px 5px;
+}
+
+.qr-card.archive .bottom-right {
+  bottom: 22px;
+  border-width: 0 5px 5px 0;
 }
 
 .qr-card.minimal {

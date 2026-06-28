@@ -1,7 +1,8 @@
-import type { RenderedManuscript, TocItem } from "../types";
+import type { ManuscriptImage, RenderedManuscript, TocItem } from "../types";
 
 const headingOne = /^#\s+(.+)$/;
 const headingTwo = /^##\s+(.+)$/;
+const imageLine = /^!\[([^\]]*)\]\((data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
 
 export const sampleManuscript = `# 第一章　傘の下の約束
 
@@ -21,6 +22,7 @@ export const sampleManuscript = `# 第一章　傘の下の約束
 
 export function renderManuscript(markdown: string): RenderedManuscript {
   const toc: TocItem[] = [];
+  const images: ManuscriptImage[] = [];
   const htmlBlocks: string[] = [];
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
 
@@ -40,13 +42,14 @@ export function renderManuscript(markdown: string): RenderedManuscript {
 
     const h1 = line.match(headingOne);
     const h2 = line.match(headingTwo);
+    const image = parseMarkdownImageLine(line, images.length + 1);
 
     if (h1) {
       flushParagraph();
       const title = h1[1].trim();
       const id = toAnchorId(title, toc.length + 1);
       toc.push({ id, title, level: 1 });
-      htmlBlocks.push(`<h1 id="${id}">${formatInline(title)}</h1>`);
+      htmlBlocks.push(`<h1 id="${id}" class="chapter-heading">${formatInline(title)}</h1>`);
       return;
     }
 
@@ -55,7 +58,18 @@ export function renderManuscript(markdown: string): RenderedManuscript {
       const title = h2[1].trim();
       const id = toAnchorId(title, toc.length + 1);
       toc.push({ id, title, level: 2 });
-      htmlBlocks.push(`<h2 id="${id}">${formatInline(title)}</h2>`);
+      htmlBlocks.push(`<h2 id="${id}" class="section-heading">${formatInline(title)}</h2>`);
+      return;
+    }
+
+    if (image) {
+      flushParagraph();
+      if (image.src.startsWith("data:image/")) images.push(image);
+      htmlBlocks.push(
+        `<figure class="manuscript-image"><img src="${escapeHtml(image.src)}" alt="${escapeHtml(
+          image.alt,
+        )}" />${image.alt ? `<figcaption>${escapeHtml(image.alt)}</figcaption>` : ""}</figure>`,
+      );
       return;
     }
 
@@ -72,6 +86,7 @@ export function renderManuscript(markdown: string): RenderedManuscript {
   return {
     html: htmlBlocks.join("\n"),
     toc,
+    images,
     wordCount,
   };
 }
@@ -103,6 +118,37 @@ export function stripMarkupForDocx(text: string): string {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1（$2）");
 }
 
+export function parseMarkdownImageLine(line: string, index = 1): ManuscriptImage | undefined {
+  const match = line.trim().match(imageLine);
+  if (!match) return undefined;
+
+  const src = match[2];
+  const mimeMatch = src.match(/^data:(image\/(png|jpe?g|gif|bmp));base64,/i);
+  const mimeType = mimeMatch?.[1]?.toLowerCase() || "image/png";
+  const rawExtension = mimeMatch?.[2]?.toLowerCase() || src.split(".").pop()?.toLowerCase() || "png";
+  const extension = rawExtension === "jpeg" ? "jpg" : normalizeImageExtension(rawExtension);
+
+  return {
+    id: `image-${index}`,
+    alt: match[1].trim(),
+    src,
+    mimeType,
+    extension,
+  };
+}
+
+export function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(",")[1] || "";
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
 export function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -123,4 +169,9 @@ function toAnchorId(title: string, index: number): string {
     .replace(/^-|-$/g, "");
 
   return `${slug || "chapter"}-${index}`;
+}
+
+function normalizeImageExtension(value: string): ManuscriptImage["extension"] {
+  if (value === "jpg" || value === "gif" || value === "bmp") return value;
+  return "png";
 }

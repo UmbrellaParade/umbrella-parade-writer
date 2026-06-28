@@ -19,8 +19,17 @@ export interface TocItem {
   level: 1 | 2;
 }
 
+export interface ManuscriptImage {
+  id: string;
+  alt: string;
+  src: string;
+  mimeType: string;
+  extension: "png" | "jpg" | "gif" | "bmp";
+}
+
 export interface RenderedManuscript {
   html: string;
   toc: TocItem[];
+  images: ManuscriptImage[];
   wordCount: number;
 }
