@@ -1248,9 +1248,11 @@ function App() {
               {pageBreaks.pageGuide ? (
                 <div className="preview-page-list">
                   {previewPages.map((page) => (
-                    <section className={`preview-sheet ${direction} ${previewTarget}`} key={page.pageNumber}>
-                      <div className="preview-sheet-body" dangerouslySetInnerHTML={{ __html: page.html }} />
-                      <span className="page-number">{page.pageNumber}</span>
+                    <section className={`preview-sheet-shell ${direction} ${previewTarget}`} key={page.pageNumber}>
+                      <div className={`preview-sheet ${direction} ${previewTarget}`}>
+                        <div className="preview-sheet-body" dangerouslySetInnerHTML={{ __html: page.html }} />
+                        <span className="page-number">{page.pageNumber}</span>
+                      </div>
                     </section>
                   ))}
                 </div>
@@ -1632,10 +1634,10 @@ function getPreviewPageCapacity(
   }
 
   if (direction === "vertical") {
-    return Math.max(6, Math.floor((target === "shimauma" ? 9 : 22) * fontScale));
+    return Math.max(14, Math.floor((target === "shimauma" ? 18 : 22) * fontScale));
   }
 
-  return Math.max(9, Math.floor((target === "shimauma" ? 14 : 32) * fontScale));
+  return Math.max(22, Math.floor((target === "shimauma" ? 30 : 32) * fontScale));
 }
 
 function estimatePreviewBlockUnits(
@@ -1679,10 +1681,10 @@ function getPreviewCharsPerLine(
   }
 
   if (direction === "vertical") {
-    return Math.max(16, Math.floor((target === "shimauma" ? 32 : 44) * fontScale));
+    return Math.max(30, Math.floor((target === "shimauma" ? 48 : 44) * fontScale));
   }
 
-  return Math.max(13, Math.floor((target === "shimauma" ? 20 : 28) * fontScale));
+  return Math.max(22, Math.floor((target === "shimauma" ? 32 : 28) * fontScale));
 }
 
 function splitPreviewBlock(

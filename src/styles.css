@@ -687,8 +687,22 @@ select:focus {
   gap: 14px;
 }
 
-.preview-sheet {
+.preview-sheet-shell {
   flex: 0 0 auto;
+  position: relative;
+}
+
+.preview-sheet-shell.kindle {
+  width: 378px;
+  height: 639px;
+}
+
+.preview-sheet-shell.shimauma {
+  width: 446px;
+  height: 632px;
+}
+
+.preview-sheet {
   position: relative;
   min-width: 0;
   overflow: hidden;
@@ -697,29 +711,30 @@ select:focus {
   background: #fffefa;
   overflow-wrap: anywhere;
   box-shadow: 0 10px 28px rgba(75, 58, 39, 0.12);
+  transform-origin: top left;
   word-break: break-word;
 }
 
 .preview-sheet.kindle {
-  aspect-ratio: 420 / 710;
-  height: min(100%, 710px);
-  width: auto;
-  min-height: 0;
-  padding: clamp(10px, 1.7vh, 14px);
+  width: 420px;
+  height: 710px;
+  padding: 14px;
   font-size: max(10px, calc(var(--writer-font-size) * 0.76));
   line-height: 1.2;
+  transform: scale(0.9);
 }
 
 .preview-sheet.shimauma {
-  aspect-ratio: 620 / 878;
-  height: min(100%, 878px);
-  width: auto;
-  min-height: 0;
-  padding: clamp(30px, 6vh, 58px) clamp(28px, 5vw, 52px);
+  width: 620px;
+  height: 878px;
+  padding: 86px 74px 74px;
   border-color: #9f8b74;
+  font-size: calc(var(--writer-font-size) * 0.88);
+  line-height: 1.72;
   box-shadow:
-    inset 0 0 0 24px #fbfaf6,
+    inset 0 0 0 18px #fbfaf6,
     0 12px 30px rgba(75, 58, 39, 0.14);
+  transform: scale(0.72);
 }
 
 .preview-sheet.vertical {
