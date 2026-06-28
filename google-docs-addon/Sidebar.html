@@ -364,6 +364,7 @@
           <button class="primary" id="refresh">Docsから更新</button>
           <button id="open-wide">大きく開く</button>
           <button id="open-external">別画面で開く</button>
+          <button id="sync-external">別画面へ同期</button>
           <button id="auto-refresh" aria-pressed="false">自動更新OFF</button>
         </div>
       </div>
@@ -499,6 +500,7 @@
       document.getElementById('refresh').addEventListener('click', refreshSnapshot);
       document.getElementById('open-wide').addEventListener('click', openWidePreview);
       document.getElementById('open-external').addEventListener('click', openExternalWriter);
+      document.getElementById('sync-external').addEventListener('click', syncExternalWriter);
       document.getElementById('auto-refresh').addEventListener('click', toggleAutoRefresh);
       document.getElementById('read-selection').addEventListener('click', readSelection);
       document.getElementById('insert-ruby').addEventListener('click', insertRuby);
@@ -584,6 +586,16 @@
           refreshSnapshot();
         }
         startAutoRefresh();
+      }
+
+      function syncExternalWriter() {
+        if (!writerWindow || writerWindow.closed) {
+          setStatus('先に「別画面で開く」を押してください。');
+          return;
+        }
+
+        setStatus('別画面へ同期しています...');
+        refreshSnapshot();
       }
 
       function toggleAutoRefresh() {
