@@ -91,7 +91,7 @@ export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = [
       flushParagraph();
       if (!images.some((item) => item.id === image.id)) images.push(image);
       htmlBlocks.push(
-        `<figure class="manuscript-image"><img src="${escapeHtml(image.src)}" alt="${escapeHtml(
+        `<figure class="manuscript-image" data-image-id="${escapeHtml(image.id)}"><img src="${escapeHtml(image.src)}" alt="${escapeHtml(
           image.alt,
         )}" />${image.alt ? `<figcaption>${escapeHtml(image.alt)}</figcaption>` : ""}</figure>`,
       );
@@ -123,6 +123,9 @@ export function formatInline(escapedText: string): string {
     })
     .replace(/\[\[large:([^\]]+)\]\]/g, (_match, text: string) => {
       return `<span class="inline-size-large">${text}</span>`;
+    })
+    .replace(/\[([^\]]+)\]\(#([^)]+)\)/g, (_match, label: string, id: string) => {
+      return `<a href="#${id}">${label}</a>`;
     })
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_match, label: string, url: string) => {
       return `<a href="${url}" target="_blank" rel="noreferrer">${label}</a>`;
@@ -188,6 +191,7 @@ export function stripMarkupForDocx(text: string): string {
     .replace(/\[\[(small|large):([^\]]+)\]\]/g, "$2")
     .replace(/｜([^《]+)《([^》]+)》/g, "$1（$2）")
     .replace(/([一-龯々ぁ-んァ-ヴーA-Za-z0-9０-９]+)《([^》]+)》/g, "$1（$2）")
+    .replace(/\[([^\]]+)\]\(#[^)\s]+\)/g, "$1")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1（$2）");
 }
 
@@ -242,7 +246,7 @@ function countJapaneseCharacters(value: string): number {
   return value.replace(/\s/g, "").length;
 }
 
-function toAnchorId(title: string, index: number): string {
+export function toAnchorId(title: string, index: number): string {
   const slug = title
     .toLowerCase()
     .replace(/[^\p{Letter}\p{Number}]+/gu, "-")

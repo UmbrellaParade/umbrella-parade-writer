@@ -4,6 +4,8 @@ export type PreviewTarget = "kindle" | "shimauma";
 
 export type WorkspaceTab = "write" | "qr" | "aplus" | "settings";
 
+export type EditorMode = "visual" | "code";
+
 export type WriterFontFamily = "noto-sans-jp" | "shippori-mincho";
 
 export type SalesChannel = "kindle" | "shimauma";
@@ -27,7 +29,21 @@ export interface PageBreakSettings {
   pageGuide: boolean;
 }
 
+export interface AplusImageItem {
+  id: string;
+  imageSrc: string;
+  imageName: string;
+  altText: string;
+  caption: string;
+  heading: string;
+  description: string;
+}
+
 export interface AplusSettings {
+  items: AplusImageItem[];
+}
+
+export interface LegacyAplusSettings {
   headline: string;
   body: string;
   imageKeyword: string;

@@ -6,7 +6,9 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  Code2,
   Download,
+  Eye,
   FileText,
   Heading1,
   ImageIcon,
@@ -24,11 +26,14 @@ import {
 import QRCode from "qrcode";
 import { AI_PROVIDERS, getDefaultAiSettings } from "./data/aiModels";
 import { exportDocx, exportEpub, exportPdf } from "./lib/exporters";
-import { renderManuscript, sampleManuscript } from "./lib/manuscript";
+import { escapeHtml, renderManuscript, sampleManuscript, toAnchorId } from "./lib/manuscript";
 import type {
   AiProviderConfig,
+  AplusImageItem,
   AplusSettings,
+  EditorMode,
   ImageAsset,
+  LegacyAplusSettings,
   PageBreakSettings,
   SalesChannel,
   TypographySettings,
@@ -71,14 +76,21 @@ const salesChannelLabels: Record<SalesChannel, string> = {
   shimauma: "しまうま",
 };
 
-const defaultAplus: AplusSettings = {
-  headline: "雨の記憶をたどる物語",
-  body: "Umbrella Paradeの世界観、登場人物、楽曲や記録室へつながる余韻を1枚にまとめます。",
-  imageKeyword: "幻想的な雨の街、傘、銀色の光",
+const defaultAplusItems: AplusImageItem[] = [1, 2, 3, 4].map((number) => ({
+  id: `aplus-${number}`,
   imageSrc: "",
   imageName: "",
-  overlayStyle: "dark",
-  textPosition: "left",
+  altText: "",
+  caption: "",
+  heading: number === 1 ? "雨の記憶をたどる物語" : "",
+  description:
+    number === 1
+      ? "Umbrella Paradeの世界観、登場人物、楽曲や記録室へつながる余韻を紹介します。"
+      : "",
+}));
+
+const defaultAplus: AplusSettings = {
+  items: defaultAplusItems,
 };
 
 type CoverImageState = {
@@ -112,6 +124,7 @@ function App() {
   const [imageAssets, setImageAssets] = useState<ImageAsset[]>(initialDraftRef.current.imageAssets);
   const [undoStacks, setUndoStacks] = useState<ManuscriptHistory>(createEmptyHistory);
   const [redoStacks, setRedoStacks] = useState<ManuscriptHistory>(createEmptyHistory);
+  const [editorMode, setEditorMode] = useState<EditorMode>("visual");
   const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [typography, setTypography] = useState<TypographySettings>(loadTypographySettings);
   const [pageBreaks, setPageBreaks] = useState<PageBreakSettings>(loadPageBreakSettings);
@@ -127,10 +140,12 @@ function App() {
   const [aiSettings, setAiSettings] = useState<AiProviderConfig[]>(loadAiSettings);
   const [status, setStatus] = useState("保存済み");
   const editorRef = useRef<HTMLTextAreaElement>(null);
+  const visualEditorRef = useRef<HTMLDivElement>(null);
+  const isSyncingVisualEditorRef = useRef(false);
   const previewRef = useRef<HTMLElement>(null);
   const qrCardRef = useRef<HTMLDivElement>(null);
   const coverImageInputRef = useRef<HTMLInputElement>(null);
-  const aplusImageInputRef = useRef<HTMLInputElement>(null);
+  const aplusImageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const aplusCardRef = useRef<HTMLDivElement>(null);
   const manuscriptImageInputRef = useRef<HTMLInputElement>(null);
   const qrImageInputRef = useRef<HTMLInputElement>(null);
@@ -151,6 +166,19 @@ function App() {
     [typography],
   );
   const qrImageSrc = externalQrDataUrl || qrDataUrl;
+
+  useEffect(() => {
+    const visualEditor = visualEditorRef.current;
+    if (!visualEditor || editorMode !== "visual") return;
+    if (visualEditor.contains(document.activeElement)) return;
+
+    const nextHtml = rendered.html || "<p><br /></p>";
+    if (visualEditor.innerHTML !== nextHtml) {
+      isSyncingVisualEditorRef.current = true;
+      visualEditor.innerHTML = nextHtml;
+      isSyncingVisualEditorRef.current = false;
+    }
+  }, [editorMode, rendered.html]);
 
   useEffect(() => {
     localStorage.setItem(storageKeys.title, title);
@@ -284,6 +312,58 @@ function App() {
     });
   };
 
+  const syncVisualEditorToManuscript = () => {
+    const visualEditor = visualEditorRef.current;
+    if (!visualEditor || isSyncingVisualEditorRef.current) return;
+
+    const next = convertVisualEditorToManuscript(visualEditor, imageAssets);
+    setStatus("編集中");
+    updateManuscript(next);
+  };
+
+  const insertVisualHtml = (html: string) => {
+    const visualEditor = visualEditorRef.current;
+    if (!visualEditor) return;
+
+    visualEditor.focus();
+    ensureSelectionInside(visualEditor);
+    document.execCommand("insertHTML", false, html);
+    syncVisualEditorToManuscript();
+  };
+
+  const getVisualSelectionText = () => {
+    const visualEditor = visualEditorRef.current;
+    const selection = window.getSelection();
+    if (!visualEditor || !selection?.rangeCount || !selection.anchorNode) return "";
+    return visualEditor.contains(selection.anchorNode) ? selection.toString() : "";
+  };
+
+  const formatVisualBlock = (tagName: "h1" | "h2" | "p") => {
+    const visualEditor = visualEditorRef.current;
+    if (!visualEditor) return false;
+
+    visualEditor.focus();
+    ensureSelectionInside(visualEditor);
+    document.execCommand("formatBlock", false, tagName);
+    syncVisualEditorToManuscript();
+    return true;
+  };
+
+  const insertVisualChapterBreak = () => {
+    const visualEditor = visualEditorRef.current;
+    const block = visualEditor ? getSelectedVisualBlock(visualEditor) : null;
+    if (!visualEditor || !block) return;
+
+    const previous = block.previousElementSibling;
+    if (!previous?.matches(".chapter-page-break")) {
+      const breakElement = document.createElement("div");
+      breakElement.className = "chapter-page-break";
+      breakElement.dataset.chapterBreak = "true";
+      breakElement.setAttribute("aria-hidden", "true");
+      block.before(breakElement);
+    }
+  };
+
   const insertAtSelection = (value: string, selectOffset = 0) => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -302,7 +382,7 @@ function App() {
 
   const handleEditorPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
     const html = event.clipboardData.getData("text/html");
-    if (!hasClipboardHeadingMarkup(html)) return;
+    if (!hasClipboardRichMarkup(html)) return;
 
     const pasted = convertHtmlToManuscriptMarkdown(html);
     if (!pasted.trim()) return;
@@ -310,6 +390,17 @@ function App() {
     event.preventDefault();
     insertAtSelection(pasted);
     setStatus("見出し付きで貼り付けました");
+  };
+
+  const handleVisualPaste = (event: ClipboardEvent<HTMLDivElement>) => {
+    const html = event.clipboardData.getData("text/html");
+    const text = event.clipboardData.getData("text/plain");
+    const pasted = html ? convertHtmlToManuscriptMarkdown(html) : text;
+    if (!pasted.trim()) return;
+
+    event.preventDefault();
+    insertVisualHtml(renderManuscript(pasted, imageAssets).html || `<p>${escapeHtml(text)}</p>`);
+    setStatus(html ? "見出し付きで貼り付けました" : "貼り付けました");
   };
 
   const cutSelection = () => {
@@ -330,6 +421,8 @@ function App() {
   };
 
   const applyHeadingOne = () => {
+    if (editorMode === "visual" && formatVisualBlock("h1")) return;
+
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -358,6 +451,14 @@ function App() {
   };
 
   const applyChapterTitle = () => {
+    if (editorMode === "visual") {
+      insertVisualChapterBreak();
+      if (formatVisualBlock("h1")) {
+        setStatus("章タイトルにしました");
+        return;
+      }
+    }
+
     const editor = editorRef.current;
     if (!editor) return;
 
@@ -388,6 +489,15 @@ function App() {
   };
 
   const addRuby = () => {
+    if (editorMode === "visual") {
+      const selected = getVisualSelectionText();
+      const base = selected || "漢字";
+      const ruby = window.prompt("ルビ", "");
+      if (ruby === null) return;
+      insertVisualHtml(`<ruby>${escapeHtml(base)}<rp>（</rp><rt>${escapeHtml(ruby || "ふりがな")}</rt><rp>）</rp></ruby>`);
+      return;
+    }
+
     const editor = editorRef.current;
     const selected = editor ? manuscript.slice(editor.selectionStart, editor.selectionEnd) : "";
     const base = selected || "漢字";
@@ -397,6 +507,15 @@ function App() {
   };
 
   const addLink = () => {
+    if (editorMode === "visual") {
+      const selected = getVisualSelectionText();
+      const label = selected || "リンク";
+      const url = window.prompt("URL", "https://");
+      if (!url) return;
+      insertVisualHtml(`<a href="${escapeHtml(url)}">${escapeHtml(label)}</a>`);
+      return;
+    }
+
     const editor = editorRef.current;
     const selected = editor ? manuscript.slice(editor.selectionStart, editor.selectionEnd) : "";
     const label = selected || "リンク";
@@ -406,15 +525,34 @@ function App() {
   };
 
   const insertInlineToc = () => {
+    if (editorMode === "visual") {
+      insertVisualHtml(createVisualTocHtml(rendered.toc));
+      return;
+    }
+
     insertAtSelection("\n\n[[TOC]]\n\n");
   };
 
   const insertPageBreak = () => {
+    if (editorMode === "visual") {
+      insertVisualHtml('<div class="manual-page-break" data-page-break="true" role="separator">改ページ</div><p><br /></p>');
+      setStatus("改ページを挿入しました");
+      return;
+    }
+
     insertAtSelection("\n\n[[PAGE_BREAK]]\n\n");
     setStatus("改ページを挿入しました");
   };
 
   const applyInlineSize = (size: "small" | "large") => {
+    if (editorMode === "visual") {
+      const selected = getVisualSelectionText();
+      const fallback = size === "small" ? "小さめ文字" : "大きめ文字";
+      const className = size === "small" ? "inline-size-small" : "inline-size-large";
+      insertVisualHtml(`<span class="${className}">${escapeHtml(selected || fallback)}</span>`);
+      return;
+    }
+
     const editor = editorRef.current;
     const selected = editor ? manuscript.slice(editor.selectionStart, editor.selectionEnd) : "";
     const fallback = size === "small" ? "小さめ文字" : "大きめ文字";
@@ -432,7 +570,11 @@ function App() {
       const alt = file.name.replace(/\.[^.]+$/, "");
       const asset = createImageAsset(file, imageSource, alt);
       setImageAssets((current) => upsertImageAsset(current, asset));
-      insertAtSelection(`\n\n![${alt}](asset:${asset.id})\n\n`);
+      if (editorMode === "visual") {
+        insertVisualHtml(createVisualImageHtml(asset));
+      } else {
+        insertAtSelection(`\n\n![${alt}](asset:${asset.id})\n\n`);
+      }
       setStatus("画像を挿入しました");
     };
     reader.readAsDataURL(file);
@@ -467,18 +609,17 @@ function App() {
     reader.readAsDataURL(file);
   };
 
-  const importAplusImage = (event: ChangeEvent<HTMLInputElement>) => {
+  const importAplusImage = (itemId: string, event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
     if (!file || !file.type.startsWith("image/")) return;
 
     const reader = new FileReader();
     reader.onload = () => {
-      setAplus((current) => ({
-        ...current,
-        imageSrc: typeof reader.result === "string" ? reader.result : "",
-        imageName: file.name,
-      }));
+      const imageSrc = typeof reader.result === "string" ? reader.result : "";
+      updateAplusItem(itemId, "imageSrc", imageSrc);
+      updateAplusItem(itemId, "imageName", file.name);
+      validateAplusImageSize(imageSrc, file.name, setStatus);
       setStatus("A+画像を読み込みました");
     };
     reader.readAsDataURL(file);
@@ -516,16 +657,16 @@ function App() {
     downloadDataUrl(coverImage.src, coverImage.name || `${title}-cover.png`);
   };
 
-  const handleAplusImageDownload = () => {
-    if (!aplus.imageSrc) return;
-    downloadDataUrl(aplus.imageSrc, aplus.imageName || `${title}-aplus-background.png`);
+  const handleAplusImageDownload = (item: AplusImageItem, index: number) => {
+    if (!item.imageSrc) return;
+    downloadDataUrl(item.imageSrc, item.imageName || `${title}-aplus-${index + 1}.png`);
   };
 
   const handleAplusDownload = async () => {
     if (!aplusCardRef.current) return;
     const canvas = await html2canvas(aplusCardRef.current, { backgroundColor: "#ffffff", scale: 2 });
     canvas.toBlob((blob) => {
-      if (blob) saveAs(blob, `${safeDownloadName(title)}-aplus-1940x600.png`);
+      if (blob) saveAs(blob, `${safeDownloadName(title)}-aplus.png`);
     });
   };
 
@@ -535,10 +676,10 @@ function App() {
     );
   };
 
-  const updateAplusSetting = <K extends keyof AplusSettings>(field: K, value: AplusSettings[K]) => {
+  const updateAplusItem = <K extends keyof AplusImageItem>(itemId: string, field: K, value: AplusImageItem[K]) => {
     setAplus((current) => ({
       ...current,
-      [field]: value,
+      items: current.items.map((item) => (item.id === itemId ? { ...item, [field]: value } : item)),
     }));
   };
 
@@ -561,6 +702,20 @@ function App() {
   };
 
   const focusEditorHeading = (id: string) => {
+    if (editorMode === "visual") {
+      const visualEditor = visualEditorRef.current;
+      const heading = Array.from(visualEditor?.querySelectorAll<HTMLElement>("[id]") || []).find(
+        (element) => element.id === id,
+      );
+      if (!visualEditor || !heading) return;
+
+      visualEditor.focus();
+      heading.scrollIntoView({ behavior: "smooth", block: "start", inline: "nearest" });
+      heading.classList.add("jump-highlight");
+      window.setTimeout(() => heading.classList.remove("jump-highlight"), 1800);
+      return;
+    }
+
     const editor = editorRef.current;
     const tocIndex = rendered.toc.findIndex((item) => item.id === id);
     if (!editor || tocIndex < 0) return;
@@ -618,6 +773,27 @@ function App() {
 
     event.preventDefault();
     jumpToHeading(id);
+  };
+
+  const handleVisualEditorClick = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const anchor = target.closest<HTMLAnchorElement>('a[href]');
+    if (!anchor) return;
+
+    const href = anchor.getAttribute("href") || "";
+    if (href.startsWith("#")) {
+      const id = href.slice(1);
+      if (rendered.toc.some((item) => item.id === id)) {
+        event.preventDefault();
+        jumpToHeading(id);
+      }
+      return;
+    }
+
+    event.preventDefault();
+    setStatus("リンクはプレビューか書き出しで開けます");
   };
 
   return (
@@ -747,7 +923,7 @@ function App() {
         {activeTab === "write" && (
           <section className="writer-grid" style={typographyStyle} aria-label="manuscript editor">
             <div className="control-strip">
-              <div className="tool-buttons primary-tools">
+              <div className="tool-buttons primary-tools" onMouseDown={(event) => event.preventDefault()}>
                 <button title="選択行を見出し1にする" onClick={applyHeadingOne}>
                   <Heading1 size={17} aria-hidden />
                 </button>
@@ -793,6 +969,17 @@ function App() {
                   accept="image/*"
                   onChange={insertManuscriptImage}
                 />
+              </div>
+
+              <div className="editor-mode-toggle segmented" aria-label="editor mode">
+                <button className={editorMode === "visual" ? "active" : ""} onClick={() => setEditorMode("visual")}>
+                  <Eye size={16} aria-hidden />
+                  ビジュアル
+                </button>
+                <button className={editorMode === "code" ? "active" : ""} onClick={() => setEditorMode("code")}>
+                  <Code2 size={16} aria-hidden />
+                  コード
+                </button>
               </div>
 
               <div className="preview-control-group" aria-label="preview controls">
@@ -887,16 +1074,17 @@ function App() {
             </div>
 
             <div className="editor-pane">
-              <div className="source-editor">
-                <textarea
-                  ref={editorRef}
-                  value={manuscript}
+              {editorMode === "visual" ? (
+                <div
+                  ref={visualEditorRef}
+                  className="visual-editor"
+                  contentEditable
+                  suppressContentEditableWarning
                   spellCheck={false}
-                  onChange={(event) => {
-                    setStatus("編集中");
-                    updateManuscript(event.target.value);
-                  }}
-                  onPaste={handleEditorPaste}
+                  aria-label="ビジュアル原稿エディタ"
+                  onInput={syncVisualEditorToManuscript}
+                  onPaste={handleVisualPaste}
+                  onClick={handleVisualEditorClick}
                   onKeyDown={(event) => {
                     const isUndo =
                       (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
@@ -915,12 +1103,48 @@ function App() {
                       redoManuscript();
                     }
 
-                    if (isCut && cutSelection()) {
-                      event.preventDefault();
+                    if (isCut) {
+                      window.setTimeout(syncVisualEditorToManuscript, 0);
                     }
                   }}
                 />
-              </div>
+              ) : (
+                <div className="source-editor">
+                  <textarea
+                    ref={editorRef}
+                    value={manuscript}
+                    spellCheck={false}
+                    onChange={(event) => {
+                      setStatus("編集中");
+                      updateManuscript(event.target.value);
+                    }}
+                    onPaste={handleEditorPaste}
+                    onKeyDown={(event) => {
+                      const isUndo =
+                        (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
+                      const isRedo =
+                        (event.ctrlKey || event.metaKey) &&
+                        (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
+                      const isCut =
+                        (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
+
+                      if (isUndo) {
+                        event.preventDefault();
+                        undoManuscript();
+                      }
+
+                      if (isRedo) {
+                        event.preventDefault();
+                        redoManuscript();
+                      }
+
+                      if (isCut && cutSelection()) {
+                        event.preventDefault();
+                      }
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             <article
@@ -1044,78 +1268,83 @@ function App() {
                 </div>
               </div>
 
-              <div>
-                <p className="panel-title">A+ 画像</p>
-                <input
-                  ref={aplusImageInputRef}
-                  className="visually-hidden"
-                  type="file"
-                  accept="image/*"
-                  onChange={importAplusImage}
-                />
-                <div className="inline-actions">
-                  <button className="secondary-action" onClick={() => aplusImageInputRef.current?.click()}>
-                    <Upload size={16} aria-hidden />
-                    背景画像
-                  </button>
-                  <button className="secondary-action" onClick={handleAplusImageDownload} disabled={!aplus.imageSrc}>
-                    <Download size={16} aria-hidden />
-                    背景保存
-                  </button>
-                </div>
+              <div className="aplus-item-editor-list">
+                {aplus.items.map((item, index) => (
+                  <section className="aplus-item-editor" key={item.id}>
+                    <div className="aplus-item-heading">
+                      <p className="panel-title">A+ 画像 {index + 1}</p>
+                      <span>300px×300px以上</span>
+                    </div>
+                    <input
+                      ref={(element) => {
+                        aplusImageInputRefs.current[item.id] = element;
+                      }}
+                      className="visually-hidden"
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => importAplusImage(item.id, event)}
+                    />
+                    <div className="inline-actions">
+                      <button
+                        className="secondary-action"
+                        onClick={() => aplusImageInputRefs.current[item.id]?.click()}
+                      >
+                        <Upload size={16} aria-hidden />
+                        画像
+                      </button>
+                      <button
+                        className="secondary-action"
+                        onClick={() => handleAplusImageDownload(item, index)}
+                        disabled={!item.imageSrc}
+                      >
+                        <Download size={16} aria-hidden />
+                        画像保存
+                      </button>
+                    </div>
+
+                    <label className="field-label" htmlFor={`${item.id}-alt`}>
+                      代替テキスト <span>{item.altText.length}/100</span>
+                    </label>
+                    <input
+                      id={`${item.id}-alt`}
+                      value={item.altText}
+                      maxLength={100}
+                      onChange={(event) => updateAplusItem(item.id, "altText", event.target.value)}
+                    />
+
+                    <label className="field-label" htmlFor={`${item.id}-caption`}>
+                      画像キャプション <span>{item.caption.length}/200</span>
+                    </label>
+                    <input
+                      id={`${item.id}-caption`}
+                      value={item.caption}
+                      maxLength={200}
+                      onChange={(event) => updateAplusItem(item.id, "caption", event.target.value)}
+                    />
+
+                    <label className="field-label" htmlFor={`${item.id}-heading`}>
+                      見出し <span>{item.heading.length}/160</span>
+                    </label>
+                    <input
+                      id={`${item.id}-heading`}
+                      value={item.heading}
+                      maxLength={160}
+                      onChange={(event) => updateAplusItem(item.id, "heading", event.target.value)}
+                    />
+
+                    <label className="field-label" htmlFor={`${item.id}-description`}>
+                      説明 <span>{item.description.length}/1000</span>
+                    </label>
+                    <textarea
+                      id={`${item.id}-description`}
+                      className="compact-textarea"
+                      value={item.description}
+                      maxLength={1000}
+                      onChange={(event) => updateAplusItem(item.id, "description", event.target.value)}
+                    />
+                  </section>
+                ))}
               </div>
-
-              <label className="field-label" htmlFor="aplus-keyword">
-                画像キーワード
-              </label>
-              <input
-                id="aplus-keyword"
-                value={aplus.imageKeyword}
-                onChange={(event) => updateAplusSetting("imageKeyword", event.target.value)}
-              />
-
-              <label className="field-label" htmlFor="aplus-headline">
-                見出し
-              </label>
-              <input
-                id="aplus-headline"
-                value={aplus.headline}
-                onChange={(event) => updateAplusSetting("headline", event.target.value)}
-              />
-
-              <label className="field-label" htmlFor="aplus-body">
-                説明文
-              </label>
-              <textarea
-                id="aplus-body"
-                className="compact-textarea"
-                value={aplus.body}
-                onChange={(event) => updateAplusSetting("body", event.target.value)}
-              />
-
-              <label className="field-label" htmlFor="aplus-position">
-                文字位置
-              </label>
-              <select
-                id="aplus-position"
-                value={aplus.textPosition}
-                onChange={(event) => updateAplusSetting("textPosition", event.target.value as AplusSettings["textPosition"])}
-              >
-                <option value="left">左</option>
-                <option value="right">右</option>
-              </select>
-
-              <label className="field-label" htmlFor="aplus-overlay">
-                文字枠
-              </label>
-              <select
-                id="aplus-overlay"
-                value={aplus.overlayStyle}
-                onChange={(event) => updateAplusSetting("overlayStyle", event.target.value as AplusSettings["overlayStyle"])}
-              >
-                <option value="dark">黒</option>
-                <option value="light">白</option>
-              </select>
 
               <button className="primary-action" onClick={handleAplusDownload}>
                 <Download size={18} aria-hidden />
@@ -1132,17 +1361,23 @@ function App() {
                 )}
               </div>
 
-              <div
-                ref={aplusCardRef}
-                className={`aplus-card ${aplus.overlayStyle} text-${aplus.textPosition}`}
-                style={aplus.imageSrc ? { backgroundImage: `url(${aplus.imageSrc})` } : undefined}
-              >
-                {!aplus.imageSrc && <div className="aplus-placeholder">A+ 1940x600</div>}
-                <div className="aplus-text-panel">
-                  <p>{aplus.imageKeyword}</p>
-                  <h2>{aplus.headline}</h2>
-                  <span>{aplus.body}</span>
-                </div>
+              <div ref={aplusCardRef} className="aplus-gallery">
+                {aplus.items.map((item, index) => (
+                  <article className="aplus-gallery-card" key={item.id}>
+                    <div className="aplus-square">
+                      {item.imageSrc ? (
+                        <img src={item.imageSrc} alt={item.altText} />
+                      ) : (
+                        <div className="aplus-placeholder">A+ {index + 1}</div>
+                      )}
+                    </div>
+                    <div className="aplus-gallery-copy">
+                      {item.caption && <p className="aplus-caption">{item.caption}</p>}
+                      <h2>{item.heading || `A+ 画像 ${index + 1}`}</h2>
+                      <p>{item.description}</p>
+                    </div>
+                  </article>
+                ))}
               </div>
             </div>
           </section>
@@ -1392,6 +1627,7 @@ function migrateInlineImages(manuscript: string, imageAssets: ImageAsset[]) {
 
 function convertHtmlToManuscriptMarkdown(html: string) {
   const documentFromClipboard = new DOMParser().parseFromString(html, "text/html");
+  const anchorMap = createClipboardAnchorMap(documentFromClipboard);
   const blocks: string[] = [];
 
   const appendBlock = (value: string) => {
@@ -1407,19 +1643,24 @@ function convertHtmlToManuscriptMarkdown(html: string) {
     const tagName = element.tagName.toLowerCase();
     const headingLevel = getClipboardHeadingLevel(element);
 
+    if (tagName === "nav" || /toc|table-of-contents|目次/i.test(`${element.className || ""} ${element.getAttribute("aria-label") || ""}`)) {
+      appendBlock("[[TOC]]");
+      return;
+    }
+
     if (headingLevel === 1) {
-      appendBlock(`# ${getClipboardInlineText(element)}`);
+      appendBlock(`# ${getClipboardInlineText(element, anchorMap)}`);
       return;
     }
 
     if (headingLevel && headingLevel >= 2) {
-      appendBlock(`## ${getClipboardInlineText(element)}`);
+      appendBlock(`## ${getClipboardInlineText(element, anchorMap)}`);
       return;
     }
 
     if (tagName === "p" || tagName === "li") {
       const prefix = tagName === "li" ? "- " : "";
-      appendBlock(`${prefix}${getClipboardInlineText(element)}`);
+      appendBlock(`${prefix}${getClipboardInlineText(element, anchorMap)}`);
       return;
     }
 
@@ -1430,7 +1671,7 @@ function convertHtmlToManuscriptMarkdown(html: string) {
     }
 
     if (isClipboardBlockElement(element)) {
-      appendBlock(getClipboardInlineText(element));
+      appendBlock(getClipboardInlineText(element, anchorMap));
       return;
     }
 
@@ -1441,8 +1682,10 @@ function convertHtmlToManuscriptMarkdown(html: string) {
   return blocks.join("\n\n");
 }
 
-function hasClipboardHeadingMarkup(html: string) {
-  return /<h[1-6]\b|role=["']heading["']|mso-outline-level:\s*[1-6]|heading\s*[1-6]/i.test(html);
+function hasClipboardRichMarkup(html: string) {
+  return /<h[1-6]\b|role=["']heading["']|mso-outline-level:\s*[1-6]|heading\s*[1-6]|<a\b|docs\.google\.com\/document/i.test(
+    html,
+  );
 }
 
 function getClipboardHeadingLevel(element: Element) {
@@ -1468,7 +1711,42 @@ function isClipboardBlockElement(element: Element) {
   );
 }
 
-function getClipboardInlineText(element: Element): string {
+type ClipboardAnchorMap = {
+  byHref: Map<string, string>;
+  byTitle: Map<string, string>;
+};
+
+function createClipboardAnchorMap(documentFromClipboard: Document): ClipboardAnchorMap {
+  const byHref = new Map<string, string>();
+  const byTitle = new Map<string, string>();
+  let headingIndex = 0;
+
+  Array.from(documentFromClipboard.body.querySelectorAll("*")).forEach((element) => {
+    if (!getClipboardHeadingLevel(element)) return;
+
+    const title = normalizeClipboardWhitespace(element.textContent || "");
+    if (!title) return;
+
+    headingIndex += 1;
+    const internalId = toAnchorId(title, headingIndex);
+    byTitle.set(normalizeClipboardLinkLabel(title), internalId);
+
+    const rawIds = [
+      element.id,
+      element.getAttribute("name"),
+      element.getAttribute("data-heading-id"),
+      element.getAttribute("data-id"),
+    ].filter(Boolean) as string[];
+
+    rawIds.forEach((rawId) => {
+      normalizeClipboardHrefVariants(rawId).forEach((href) => byHref.set(href, internalId));
+    });
+  });
+
+  return { byHref, byTitle };
+}
+
+function getClipboardInlineText(element: Element, anchorMap: ClipboardAnchorMap): string {
   const readNode = (node: Node): string => {
     if (node.nodeType === Node.TEXT_NODE) return node.textContent || "";
     if (node.nodeType !== Node.ELEMENT_NODE) return "";
@@ -1481,6 +1759,9 @@ function getClipboardInlineText(element: Element): string {
     if (tagName === "a") {
       const href = child.getAttribute("href");
       const label = normalizeClipboardWhitespace(text);
+      const internalId = href && label ? resolveClipboardInternalLink(href, label, anchorMap) : "";
+      if (internalId && label) return `[${label}](#${internalId})`;
+      if (href && isGoogleDocsHeadingLink(href)) return label;
       return href && /^https?:\/\//i.test(href) && label ? `[${label}](${href})` : text;
     }
 
@@ -1492,6 +1773,209 @@ function getClipboardInlineText(element: Element): string {
 
 function normalizeClipboardWhitespace(value: string) {
   return value.replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ").replace(/\s+\n/g, "\n").replace(/\n\s+/g, "\n").trim();
+}
+
+function resolveClipboardInternalLink(href: string, label: string, anchorMap: ClipboardAnchorMap) {
+  for (const variant of normalizeClipboardHrefVariants(href)) {
+    const internalId = anchorMap.byHref.get(variant);
+    if (internalId) return internalId;
+  }
+
+  const titleMatch = anchorMap.byTitle.get(normalizeClipboardLinkLabel(label));
+  if (titleMatch && isGoogleDocsHeadingLink(href)) return titleMatch;
+
+  return "";
+}
+
+function normalizeClipboardHrefVariants(href: string) {
+  const values = new Set<string>();
+  const decoded = decodeURIComponent(href).trim();
+  const add = (value: string) => {
+    if (!value) return;
+    values.add(value);
+    values.add(value.startsWith("#") ? value.slice(1) : `#${value}`);
+    values.add(value.replace(/^#heading=/, "#"));
+    values.add(value.replace(/^heading=/, ""));
+  };
+
+  add(decoded);
+
+  try {
+    const url = new URL(decoded, window.location.href);
+    add(url.hash);
+    add(url.hash.replace(/^#heading=/, "#"));
+    add(url.hash.replace(/^#/, ""));
+  } catch {
+    // Plain fragment values are common in pasted document HTML.
+  }
+
+  return Array.from(values);
+}
+
+function normalizeClipboardLinkLabel(value: string) {
+  return normalizeClipboardWhitespace(value).replace(/\s+/g, "");
+}
+
+function isGoogleDocsHeadingLink(href: string) {
+  return /docs\.google\.com\/document|#heading=|heading=h\.|heading\./i.test(href);
+}
+
+function convertVisualEditorToManuscript(root: HTMLElement, imageAssets: ImageAsset[]) {
+  const blocks: string[] = [];
+
+  const appendBlock = (value: string) => {
+    const normalized = value
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    if (normalized) blocks.push(normalized);
+  };
+
+  const serializeBlock = (element: Element) => {
+    const tagName = element.tagName.toLowerCase();
+
+    if (element.matches(".manual-page-break,[data-page-break='true']")) {
+      appendBlock("[[PAGE_BREAK]]");
+      return;
+    }
+
+    if (element.matches(".chapter-page-break,[data-chapter-break='true']")) {
+      appendBlock("[[CHAPTER_BREAK]]");
+      return;
+    }
+
+    if (element.matches(".manuscript-toc")) {
+      appendBlock("[[TOC]]");
+      return;
+    }
+
+    if (tagName === "figure" && element.classList.contains("manuscript-image")) {
+      const image = element.querySelector("img");
+      const assetId = element.getAttribute("data-image-id") || "";
+      const asset = imageAssets.find((item) => item.id === assetId || item.src === image?.getAttribute("src"));
+      const alt = image?.getAttribute("alt") || asset?.alt || "";
+      const src = asset ? `asset:${asset.id}` : image?.getAttribute("src") || "";
+      if (src) appendBlock(`![${alt}](${src})`);
+      return;
+    }
+
+    if (tagName === "h1") {
+      appendBlock(`# ${serializeInlineNodes(Array.from(element.childNodes))}`);
+      return;
+    }
+
+    if (tagName === "h2") {
+      appendBlock(`## ${serializeInlineNodes(Array.from(element.childNodes))}`);
+      return;
+    }
+
+    if (tagName === "p" || tagName === "div" || tagName === "li") {
+      appendBlock(serializeInlineNodes(Array.from(element.childNodes)));
+      return;
+    }
+
+    appendBlock(serializeInlineNodes(Array.from(element.childNodes)));
+  };
+
+  Array.from(root.children).forEach(serializeBlock);
+
+  if (!blocks.length) {
+    appendBlock(serializeInlineNodes(Array.from(root.childNodes)));
+  }
+
+  return blocks.join("\n\n");
+}
+
+function serializeInlineNodes(nodes: Node[]): string {
+  return nodes.map(serializeInlineNode).join("").replace(/[ \t]+/g, " ").trim();
+}
+
+function serializeInlineNode(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) return node.textContent || "";
+  if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+  const element = node as Element;
+  const tagName = element.tagName.toLowerCase();
+
+  if (tagName === "br") return "\n";
+
+  if (tagName === "a") {
+    const label = serializeInlineNodes(Array.from(element.childNodes));
+    const href = element.getAttribute("href") || "";
+    if (!label) return "";
+    if (href.startsWith("#")) return `[${label}](${href})`;
+    if (/^https?:\/\//i.test(href)) return `[${label}](${href})`;
+    return label;
+  }
+
+  if (tagName === "ruby") {
+    const rubyText = Array.from(element.querySelectorAll("rt"))
+      .map((rt) => rt.textContent || "")
+      .join("");
+    const base = Array.from(element.childNodes)
+      .filter((child) => child.nodeType === Node.TEXT_NODE || (child as Element).tagName?.toLowerCase() !== "rt")
+      .map((child) => {
+        if (child.nodeType === Node.TEXT_NODE) return child.textContent || "";
+        const childElement = child as Element;
+        return childElement.tagName.toLowerCase() === "rp" ? "" : childElement.textContent || "";
+      })
+      .join("");
+    return rubyText ? `｜${base}《${rubyText}》` : base;
+  }
+
+  if (element.classList.contains("inline-size-small")) {
+    return `[[small:${serializeInlineNodes(Array.from(element.childNodes))}]]`;
+  }
+
+  if (element.classList.contains("inline-size-large")) {
+    return `[[large:${serializeInlineNodes(Array.from(element.childNodes))}]]`;
+  }
+
+  return serializeInlineNodes(Array.from(element.childNodes));
+}
+
+function ensureSelectionInside(root: HTMLElement) {
+  const selection = window.getSelection();
+  if (selection?.rangeCount && selection.anchorNode && root.contains(selection.anchorNode)) return;
+
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.collapse(false);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
+function getSelectedVisualBlock(root: HTMLElement) {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || !selection.anchorNode || !root.contains(selection.anchorNode)) return null;
+
+  const startElement =
+    selection.anchorNode.nodeType === Node.ELEMENT_NODE
+      ? (selection.anchorNode as Element)
+      : selection.anchorNode.parentElement;
+
+  const block = startElement?.closest("h1,h2,p,div,li,figure") || null;
+  if (block === root) return root.querySelector("h1,h2,p,div,li,figure");
+  return block;
+}
+
+function createVisualTocHtml(toc: { id: string; title: string; level: 1 | 2 }[]) {
+  const entries = toc
+    .map((item) => `<li class="toc-level-${item.level}"><a href="#${item.id}">${escapeHtml(item.title)}</a></li>`)
+    .join("");
+
+  return `<nav class="manuscript-toc" aria-label="目次"><h2>目次</h2>${
+    entries ? `<ol>${entries}</ol>` : "<p>見出し1を追加すると目次が作られます。</p>"
+  }</nav><p><br /></p>`;
+}
+
+function createVisualImageHtml(asset: ImageAsset) {
+  return `<figure class="manuscript-image" data-image-id="${escapeHtml(asset.id)}"><img src="${escapeHtml(
+    asset.src,
+  )}" alt="${escapeHtml(asset.alt)}" />${
+    asset.alt ? `<figcaption>${escapeHtml(asset.alt)}</figcaption>` : ""
+  }</figure><p><br /></p>`;
 }
 
 function createImageAsset(file: File | undefined, src: string, alt: string): ImageAsset {
@@ -1584,18 +2068,46 @@ function loadAplusSettings(): AplusSettings {
   if (!stored) return defaultAplus;
 
   try {
-    const parsed = JSON.parse(stored) as Partial<AplusSettings>;
+    const parsed = JSON.parse(stored) as Partial<AplusSettings & LegacyAplusSettings>;
+    if (Array.isArray(parsed.items)) {
+      return {
+        items: normalizeAplusItems(parsed.items),
+      };
+    }
+
     return {
-      ...defaultAplus,
-      ...parsed,
-      overlayStyle: parsed.overlayStyle === "light" || parsed.overlayStyle === "dark" ? parsed.overlayStyle : "dark",
-      textPosition: parsed.textPosition === "right" || parsed.textPosition === "left" ? parsed.textPosition : "left",
-      imageSrc: parsed.imageSrc || "",
-      imageName: parsed.imageName || "",
+      items: normalizeAplusItems([
+        {
+          id: "aplus-1",
+          imageSrc: parsed.imageSrc || "",
+          imageName: parsed.imageName || "",
+          altText: parsed.imageKeyword || "",
+          caption: parsed.imageKeyword || "",
+          heading: parsed.headline || "",
+          description: parsed.body || "",
+        },
+      ]),
     };
   } catch {
     return defaultAplus;
   }
+}
+
+function normalizeAplusItems(items: Partial<AplusImageItem>[]): AplusImageItem[] {
+  return defaultAplusItems.map((defaultItem, index) => {
+    const storedItem = items[index] || items.find((item) => item.id === defaultItem.id) || {};
+    return {
+      ...defaultItem,
+      ...storedItem,
+      id: defaultItem.id,
+      imageSrc: storedItem.imageSrc || "",
+      imageName: storedItem.imageName || "",
+      altText: (storedItem.altText || "").slice(0, 100),
+      caption: (storedItem.caption || "").slice(0, 200),
+      heading: (storedItem.heading || "").slice(0, 160),
+      description: (storedItem.description || "").slice(0, 1000),
+    };
+  });
 }
 
 function getWriterFontStack(fontFamily: TypographySettings["fontFamily"]) {
@@ -1630,6 +2142,16 @@ async function downloadDataUrl(dataUrl: string, filename: string) {
   const response = await fetch(dataUrl);
   const blob = await response.blob();
   saveAs(blob, safeDownloadName(filename));
+}
+
+function validateAplusImageSize(dataUrl: string, filename: string, setStatus: (value: string) => void) {
+  const image = new Image();
+  image.onload = () => {
+    if (image.naturalWidth < 300 || image.naturalHeight < 300) {
+      setStatus(`${filename} は300px×300px未満です`);
+    }
+  };
+  image.src = dataUrl;
 }
 
 function safeDownloadName(value: string) {

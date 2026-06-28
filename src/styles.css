@@ -455,14 +455,18 @@ select:focus {
   padding: 10px;
 }
 
-.source-editor {
+.source-editor,
+.visual-editor {
   flex: 1 1 auto;
   min-height: 0;
-  display: flex;
   border: 1px solid #e0d5c7;
   border-radius: 8px;
   overflow: hidden;
   background: #fffefa;
+}
+
+.source-editor {
+  display: flex;
 }
 
 .source-editor textarea {
@@ -477,6 +481,110 @@ select:focus {
   font-family: var(--writer-font-family);
   font-size: var(--writer-font-size);
   background: transparent;
+}
+
+.visual-editor {
+  overflow: auto;
+  padding: 28px;
+  line-height: 1.9;
+  font-family: var(--writer-font-family);
+  font-size: var(--writer-font-size);
+  outline: none;
+}
+
+.visual-editor:empty::before {
+  content: "本文を書きはじめる";
+  color: #9b8d7b;
+}
+
+.visual-editor h1,
+.visual-editor h2,
+.visual-editor p,
+.visual-editor figure {
+  margin-top: 0;
+}
+
+.visual-editor h1 {
+  margin-bottom: 1.3em;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.visual-editor h2 {
+  margin-bottom: 1em;
+  font-size: 1.14rem;
+  font-weight: 700;
+}
+
+.visual-editor p {
+  margin-bottom: 1.4em;
+}
+
+.visual-editor a {
+  color: #0b61d8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.visual-editor ruby rt {
+  font-size: 0.5em;
+}
+
+.visual-editor .inline-size-small {
+  font-size: 0.86em;
+}
+
+.visual-editor .inline-size-large {
+  font-size: 1.18em;
+}
+
+.visual-editor .manual-page-break,
+.visual-editor .chapter-page-break {
+  margin: 24px 0;
+  border-block-start: 1px dashed #b7a58f;
+  color: #7b6a56;
+  font-family:
+    "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.visual-editor .chapter-page-break::before {
+  content: "章をページの先頭へ";
+}
+
+.visual-editor .manuscript-image {
+  margin: 24px 0;
+  text-align: center;
+}
+
+.visual-editor .manuscript-image img {
+  display: inline-block;
+  max-width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.visual-editor .manuscript-image figcaption {
+  margin-top: 8px;
+  color: #6b5b48;
+  font-size: 0.82rem;
+}
+
+.visual-editor .manuscript-toc {
+  margin: 0 0 2em;
+}
+
+.visual-editor .manuscript-toc ol {
+  padding-inline-start: 1.5em;
+}
+
+.visual-editor .jump-highlight {
+  background: rgba(255, 218, 112, 0.34);
+  box-shadow: 0 0 0 8px rgba(255, 218, 112, 0.2);
 }
 
 .preview-page {
@@ -718,7 +826,7 @@ select:focus {
 }
 
 .aplus-workspace {
-  grid-template-columns: 340px minmax(420px, 1fr);
+  grid-template-columns: minmax(360px, 520px) minmax(460px, 1fr);
 }
 
 .settings-panel {
@@ -732,6 +840,13 @@ select:focus {
   padding: 10px 11px;
   resize: vertical;
   line-height: 1.6;
+}
+
+.field-label span {
+  float: right;
+  color: #8b7c6a;
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 
 .inline-actions {
@@ -775,6 +890,33 @@ select:focus {
   align-content: start;
 }
 
+.aplus-item-editor-list {
+  display: grid;
+  gap: 14px;
+}
+
+.aplus-item-editor {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #d6ccbe;
+  border-radius: 8px;
+  background: #fffefa;
+}
+
+.aplus-item-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.aplus-item-heading span {
+  color: #806a48;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .cover-preview {
   width: min(100%, 360px);
   aspect-ratio: 1 / 1.6;
@@ -801,6 +943,70 @@ select:focus {
   color: #8b7c6a;
   font-weight: 700;
   background: repeating-linear-gradient(135deg, #fffefa 0 14px, #f1eadf 14px 28px);
+}
+
+.aplus-gallery {
+  width: min(100%, 860px);
+  padding: 18px;
+  border: 1px solid #d6ccbe;
+  border-radius: 8px;
+  background: #fffefa;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 18px;
+}
+
+.aplus-gallery-card {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  border: 1px solid #e0d5c7;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.aplus-square {
+  aspect-ratio: 1;
+  min-height: 260px;
+  background: #f1eadf;
+  overflow: hidden;
+}
+
+.aplus-square img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.aplus-gallery-copy {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 16px;
+}
+
+.aplus-gallery-copy h2,
+.aplus-gallery-copy p {
+  margin: 0;
+}
+
+.aplus-gallery-copy h2 {
+  color: #1f2f2d;
+  font-size: 1.05rem;
+  line-height: 1.35;
+}
+
+.aplus-gallery-copy p {
+  color: #3f3830;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.aplus-caption {
+  color: #806a48;
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .aplus-card {
@@ -1116,8 +1322,13 @@ select:focus {
   }
 
   .preview-page:not(.show-page-guides),
-  .source-editor textarea {
+  .source-editor textarea,
+  .visual-editor {
     padding: 20px;
+  }
+
+  .aplus-gallery {
+    grid-template-columns: 1fr;
   }
 
   .aplus-card {
