@@ -110,6 +110,13 @@ a {
   gap: 8px;
 }
 
+.channel-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-inline-start: 2px;
+}
+
 .tabbar button,
 .exportbar button,
 .tool-buttons button,
@@ -130,6 +137,12 @@ a {
   color: #fffdf8;
   border-color: #153f3d;
   background: #153f3d;
+}
+
+.tabbar .channel-tabs button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.84rem;
 }
 
 .exportbar {
@@ -268,12 +281,14 @@ select:focus {
   gap: 8px;
 }
 
-.sales-channel-panel {
+.sales-channel-panel,
+.active-channel-note {
   display: grid;
   gap: 8px;
 }
 
-.sales-channel-panel .panel-title {
+.sales-channel-panel .panel-title,
+.active-channel-note .panel-title {
   margin: 0;
 }
 

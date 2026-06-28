@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ChangeEvent, MouseEvent } from "react";
+import type { CSSProperties, ChangeEvent, ClipboardEvent, MouseEvent } from "react";
 import html2canvas from "html2canvas";
 import { saveAs } from "file-saver";
 import {
@@ -30,7 +30,6 @@ import type {
   AplusSettings,
   ImageAsset,
   PageBreakSettings,
-  PreviewTarget,
   SalesChannel,
   TypographySettings,
   WorkspaceTab,
@@ -39,6 +38,7 @@ import type {
 
 const storageKeys = {
   manuscript: "umbrella-parade-writer:manuscript",
+  manuscripts: "umbrella-parade-writer:manuscripts",
   title: "umbrella-parade-writer:title",
   aiSettings: "umbrella-parade-writer:ai-settings",
   imageAssets: "umbrella-parade-writer:image-assets",
@@ -47,11 +47,6 @@ const storageKeys = {
   coverImage: "umbrella-parade-writer:cover-image",
   aplus: "umbrella-parade-writer:aplus",
   salesChannel: "umbrella-parade-writer:sales-channel",
-};
-
-const previewLabels: Record<PreviewTarget, string> = {
-  kindle: "Kindle",
-  shimauma: "しまうま",
 };
 
 const defaultTypography: TypographySettings = {
@@ -96,19 +91,28 @@ const defaultCoverImage: CoverImageState = {
   name: "",
 };
 
+type ManuscriptsByChannel = Record<SalesChannel, string>;
+type ManuscriptHistory = Record<SalesChannel, string[]>;
+
+function createEmptyHistory(): ManuscriptHistory {
+  return {
+    kindle: [],
+    shimauma: [],
+  };
+}
+
 function App() {
   const initialDraftRef = useRef<ReturnType<typeof loadInitialDraft> | null>(null);
   if (!initialDraftRef.current) initialDraftRef.current = loadInitialDraft();
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("write");
   const [title, setTitle] = useState(() => localStorage.getItem(storageKeys.title) || "Umbrella Parade Manuscript");
-  const [manuscript, setManuscript] = useState(initialDraftRef.current.manuscript);
-  const [imageAssets, setImageAssets] = useState<ImageAsset[]>(initialDraftRef.current.imageAssets);
-  const [undoStack, setUndoStack] = useState<string[]>([]);
-  const [redoStack, setRedoStack] = useState<string[]>([]);
-  const [direction, setDirection] = useState<WritingDirection>("horizontal");
-  const [previewTarget, setPreviewTarget] = useState<PreviewTarget>("kindle");
   const [salesChannel, setSalesChannel] = useState<SalesChannel>(loadSalesChannel);
+  const [manuscripts, setManuscripts] = useState<ManuscriptsByChannel>(initialDraftRef.current.manuscripts);
+  const [imageAssets, setImageAssets] = useState<ImageAsset[]>(initialDraftRef.current.imageAssets);
+  const [undoStacks, setUndoStacks] = useState<ManuscriptHistory>(createEmptyHistory);
+  const [redoStacks, setRedoStacks] = useState<ManuscriptHistory>(createEmptyHistory);
+  const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [typography, setTypography] = useState<TypographySettings>(loadTypographySettings);
   const [pageBreaks, setPageBreaks] = useState<PageBreakSettings>(loadPageBreakSettings);
   const [coverImage, setCoverImage] = useState<CoverImageState>(loadCoverImage);
@@ -131,6 +135,8 @@ function App() {
   const manuscriptImageInputRef = useRef<HTMLInputElement>(null);
   const qrImageInputRef = useRef<HTMLInputElement>(null);
 
+  const manuscript = manuscripts[salesChannel] ?? sampleManuscript;
+  const previewTarget = salesChannel;
   const rendered = useMemo(() => renderManuscript(manuscript, imageAssets), [imageAssets, manuscript]);
   const typographyStyle = useMemo(
     () =>
@@ -144,9 +150,10 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem(storageKeys.title, title);
+    localStorage.setItem(storageKeys.manuscripts, JSON.stringify(manuscripts));
     localStorage.setItem(storageKeys.manuscript, manuscript);
     setStatus("保存済み");
-  }, [title, manuscript]);
+  }, [title, manuscript, manuscripts]);
 
   useEffect(() => {
     localStorage.setItem(storageKeys.aiSettings, JSON.stringify(aiSettings));
@@ -194,28 +201,57 @@ function App() {
 
   const updateManuscript = (next: string) => {
     if (next === manuscript) return;
-    setUndoStack((current) => [...current.slice(-99), manuscript]);
-    setRedoStack([]);
-    setManuscript(next);
+    setUndoStacks((current) => ({
+      ...current,
+      [salesChannel]: [...current[salesChannel].slice(-99), manuscript],
+    }));
+    setRedoStacks((current) => ({
+      ...current,
+      [salesChannel]: [],
+    }));
+    setManuscripts((current) => ({
+      ...current,
+      [salesChannel]: next,
+    }));
   };
 
   const undoManuscript = () => {
-    setUndoStack((current) => {
-      const previous = current.at(-1);
+    setUndoStacks((current) => {
+      const activeStack = current[salesChannel];
+      const previous = activeStack.at(-1);
       if (previous === undefined) return current;
-      setRedoStack((redo) => [...redo.slice(-99), manuscript]);
-      setManuscript(previous);
-      return current.slice(0, -1);
+      setRedoStacks((redo) => ({
+        ...redo,
+        [salesChannel]: [...redo[salesChannel].slice(-99), manuscript],
+      }));
+      setManuscripts((drafts) => ({
+        ...drafts,
+        [salesChannel]: previous,
+      }));
+      return {
+        ...current,
+        [salesChannel]: activeStack.slice(0, -1),
+      };
     });
   };
 
   const redoManuscript = () => {
-    setRedoStack((current) => {
-      const next = current.at(-1);
+    setRedoStacks((current) => {
+      const activeStack = current[salesChannel];
+      const next = activeStack.at(-1);
       if (next === undefined) return current;
-      setUndoStack((undo) => [...undo.slice(-99), manuscript]);
-      setManuscript(next);
-      return current.slice(0, -1);
+      setUndoStacks((undo) => ({
+        ...undo,
+        [salesChannel]: [...undo[salesChannel].slice(-99), manuscript],
+      }));
+      setManuscripts((drafts) => ({
+        ...drafts,
+        [salesChannel]: next,
+      }));
+      return {
+        ...current,
+        [salesChannel]: activeStack.slice(0, -1),
+      };
     });
   };
 
@@ -233,6 +269,18 @@ function App() {
       editor.setSelectionRange(cursor, cursor);
       editor.scrollTop = scrollTop;
     });
+  };
+
+  const handleEditorPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
+    const html = event.clipboardData.getData("text/html");
+    if (!hasClipboardHeadingMarkup(html)) return;
+
+    const pasted = convertHtmlToManuscriptMarkdown(html);
+    if (!pasted.trim()) return;
+
+    event.preventDefault();
+    insertAtSelection(pasted);
+    setStatus("見出し付きで貼り付けました");
   };
 
   const cutSelection = () => {
@@ -425,7 +473,6 @@ function App() {
 
   const chooseSalesChannel = (channel: SalesChannel) => {
     setSalesChannel(channel);
-    setPreviewTarget(channel);
     if (channel === "kindle" && activeTab === "qr") {
       setActiveTab("write");
     }
@@ -518,6 +565,20 @@ function App() {
             <FileText size={18} aria-hidden />
             原稿
           </button>
+          <div className="channel-tabs" aria-label="原稿種別">
+            {(Object.keys(salesChannelLabels) as SalesChannel[]).map((channel) => (
+              <button
+                key={channel}
+                className={salesChannel === channel ? "active" : ""}
+                onClick={() => {
+                  setActiveTab("write");
+                  chooseSalesChannel(channel);
+                }}
+              >
+                {salesChannelLabels[channel]}
+              </button>
+            ))}
+          </div>
           <button
             className={activeTab === "qr" ? "active" : ""}
             onClick={() => setActiveTab("qr")}
@@ -560,19 +621,8 @@ function App() {
           </label>
           <input id="book-title" value={title} onChange={(event) => setTitle(event.target.value)} />
 
-          <div className="sales-channel-panel">
-            <p className="panel-title">制作先</p>
-            <div className="segmented compact-segmented">
-              {(Object.keys(salesChannelLabels) as SalesChannel[]).map((channel) => (
-                <button
-                  key={channel}
-                  className={salesChannel === channel ? "active" : ""}
-                  onClick={() => chooseSalesChannel(channel)}
-                >
-                  {salesChannelLabels[channel]}
-                </button>
-              ))}
-            </div>
+          <div className="active-channel-note">
+            <p className="panel-title">制作先：{salesChannelLabels[salesChannel]}</p>
             <p className="mode-hint">
               {salesChannel === "kindle"
                 ? "Kindleは本文リンクで誘導。QRは紙面用です。"
@@ -630,10 +680,10 @@ function App() {
                 <button title="選択行を見出し1にする" onClick={applyHeadingOne}>
                   <Heading1 size={17} aria-hidden />
                 </button>
-                <button title="元に戻す" onClick={undoManuscript} disabled={!undoStack.length}>
+                <button title="元に戻す" onClick={undoManuscript} disabled={!undoStacks[salesChannel].length}>
                   <Undo2 size={17} aria-hidden />
                 </button>
-                <button title="やり直す" onClick={redoManuscript} disabled={!redoStack.length}>
+                <button title="やり直す" onClick={redoManuscript} disabled={!redoStacks[salesChannel].length}>
                   <Redo2 size={17} aria-hidden />
                 </button>
                 <button title="ルビを振る" onClick={addRuby}>
@@ -661,7 +711,7 @@ function App() {
               </div>
 
               <div className="preview-control-group" aria-label="preview controls">
-                <span className="control-label">プレビュー</span>
+                <span className="control-label">プレビュー：{salesChannelLabels[salesChannel]}</span>
                 <div className="segmented">
                   <button
                     className={direction === "horizontal" ? "active" : ""}
@@ -672,15 +722,6 @@ function App() {
                   <button className={direction === "vertical" ? "active" : ""} onClick={() => setDirection("vertical")}>
                     縦書き
                   </button>
-                  {(Object.keys(previewLabels) as PreviewTarget[]).map((target) => (
-                    <button
-                      key={target}
-                      className={previewTarget === target ? "active" : ""}
-                      onClick={() => setPreviewTarget(target)}
-                    >
-                      {previewLabels[target]}
-                    </button>
-                  ))}
                 </div>
                 <label className="toggle-control">
                   <input
@@ -769,6 +810,7 @@ function App() {
                   setStatus("編集中");
                   updateManuscript(event.target.value);
                 }}
+                onPaste={handleEditorPaste}
                 onKeyDown={(event) => {
                   const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
                   const isRedo =
@@ -1073,9 +1115,42 @@ function App() {
 }
 
 function loadInitialDraft() {
-  const storedManuscript = localStorage.getItem(storageKeys.manuscript) || sampleManuscript;
   const storedAssets = loadImageAssets();
-  return migrateInlineImages(storedManuscript, storedAssets);
+  const storedManuscripts = loadStoredManuscripts();
+  const kindleDraft = migrateInlineImages(storedManuscripts.kindle, storedAssets);
+  const shimaumaDraft = migrateInlineImages(storedManuscripts.shimauma, kindleDraft.imageAssets);
+
+  return {
+    manuscripts: {
+      kindle: kindleDraft.manuscript,
+      shimauma: shimaumaDraft.manuscript,
+    },
+    imageAssets: shimaumaDraft.imageAssets,
+  };
+}
+
+function loadStoredManuscripts(): ManuscriptsByChannel {
+  const legacyManuscript = localStorage.getItem(storageKeys.manuscript) || sampleManuscript;
+  const stored = localStorage.getItem(storageKeys.manuscripts);
+  if (!stored) {
+    return {
+      kindle: legacyManuscript,
+      shimauma: legacyManuscript,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<ManuscriptsByChannel>;
+    return {
+      kindle: typeof parsed.kindle === "string" ? parsed.kindle : legacyManuscript,
+      shimauma: typeof parsed.shimauma === "string" ? parsed.shimauma : legacyManuscript,
+    };
+  } catch {
+    return {
+      kindle: legacyManuscript,
+      shimauma: legacyManuscript,
+    };
+  }
 }
 
 function loadImageAssets(): ImageAsset[] {
@@ -1108,6 +1183,110 @@ function migrateInlineImages(manuscript: string, imageAssets: ImageAsset[]) {
     manuscript: nextManuscript,
     imageAssets: nextAssets,
   };
+}
+
+function convertHtmlToManuscriptMarkdown(html: string) {
+  const documentFromClipboard = new DOMParser().parseFromString(html, "text/html");
+  const blocks: string[] = [];
+
+  const appendBlock = (value: string) => {
+    const normalized = value
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    if (normalized) blocks.push(normalized);
+  };
+
+  const walkElement = (element: Element) => {
+    const tagName = element.tagName.toLowerCase();
+    const headingLevel = getClipboardHeadingLevel(element);
+
+    if (headingLevel === 1) {
+      appendBlock(`# ${getClipboardInlineText(element)}`);
+      return;
+    }
+
+    if (headingLevel && headingLevel >= 2) {
+      appendBlock(`## ${getClipboardInlineText(element)}`);
+      return;
+    }
+
+    if (tagName === "p" || tagName === "li") {
+      const prefix = tagName === "li" ? "- " : "";
+      appendBlock(`${prefix}${getClipboardInlineText(element)}`);
+      return;
+    }
+
+    const children = Array.from(element.children);
+    if (tagName === "div" && children.some((child) => getClipboardHeadingLevel(child) || isClipboardBlockElement(child))) {
+      children.forEach(walkElement);
+      return;
+    }
+
+    if (isClipboardBlockElement(element)) {
+      appendBlock(getClipboardInlineText(element));
+      return;
+    }
+
+    children.forEach(walkElement);
+  };
+
+  Array.from(documentFromClipboard.body.children).forEach(walkElement);
+  return blocks.join("\n\n");
+}
+
+function hasClipboardHeadingMarkup(html: string) {
+  return /<h[1-6]\b|role=["']heading["']|mso-outline-level:\s*[1-6]|heading\s*[1-6]/i.test(html);
+}
+
+function getClipboardHeadingLevel(element: Element) {
+  const tagName = element.tagName.toLowerCase();
+  const tagMatch = tagName.match(/^h([1-6])$/);
+  if (tagMatch) return Number(tagMatch[1]);
+
+  if (element.getAttribute("role") === "heading") {
+    const ariaLevel = Number(element.getAttribute("aria-level"));
+    if (ariaLevel >= 1 && ariaLevel <= 6) return ariaLevel;
+  }
+
+  const descriptor = `${element.getAttribute("style") || ""} ${element.className || ""}`;
+  if (/mso-outline-level:\s*1|heading\s*1/i.test(descriptor)) return 1;
+  if (/mso-outline-level:\s*2|heading\s*2/i.test(descriptor)) return 2;
+
+  return 0;
+}
+
+function isClipboardBlockElement(element: Element) {
+  return /^(address|article|aside|blockquote|dd|div|dl|dt|figcaption|figure|footer|header|main|nav|ol|p|section|table|ul)$/i.test(
+    element.tagName,
+  );
+}
+
+function getClipboardInlineText(element: Element): string {
+  const readNode = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent || "";
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+    const child = node as Element;
+    const tagName = child.tagName.toLowerCase();
+    if (tagName === "br") return "\n";
+
+    const text = Array.from(child.childNodes).map(readNode).join("");
+    if (tagName === "a") {
+      const href = child.getAttribute("href");
+      const label = normalizeClipboardWhitespace(text);
+      return href && /^https?:\/\//i.test(href) && label ? `[${label}](${href})` : text;
+    }
+
+    return text;
+  };
+
+  return normalizeClipboardWhitespace(Array.from(element.childNodes).map(readNode).join(""));
+}
+
+function normalizeClipboardWhitespace(value: string) {
+  return value.replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ").replace(/\s+\n/g, "\n").replace(/\n\s+/g, "\n").trim();
 }
 
 function createImageAsset(file: File | undefined, src: string, alt: string): ImageAsset {
