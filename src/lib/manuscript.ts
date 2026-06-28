@@ -4,6 +4,7 @@ const headingOne = /^#\s+(.+)$/;
 const headingTwo = /^##\s+(.+)$/;
 const inlineTocMarker = /^\[\[TOC\]\]$/i;
 const pageBreakMarker = /^\[\[PAGE_BREAK\]\]$/i;
+const chapterBreakMarker = /^\[\[CHAPTER_BREAK\]\]$/i;
 const imageLine = /^!\[([^\]]*)\]\((asset:[A-Za-z0-9_-]+|data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
 
 export const sampleManuscript = `# 第一章　傘の下の約束
@@ -59,11 +60,22 @@ export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = [
       return;
     }
 
+    if (chapterBreakMarker.test(line.trim())) {
+      flushParagraph();
+      htmlBlocks.push(`<div class="chapter-page-break" data-chapter-break="true" aria-hidden="true"></div>`);
+      return;
+    }
+
     if (h1) {
       flushParagraph();
       const title = h1[1].trim();
       const item = toc[headingIndex++] || { id: toAnchorId(title, headingIndex), title, level: 1 };
-      htmlBlocks.push(`<h1 id="${item.id}" class="chapter-heading">${formatInline(title)}</h1>`);
+      const chapterStart = isChapterTitle(title);
+      htmlBlocks.push(
+        `<h1 id="${item.id}" class="chapter-heading${chapterStart ? " chapter-start" : ""}"${
+          chapterStart ? ' data-chapter-start="true"' : ""
+        }>${formatInline(title)}</h1>`,
+      );
       return;
     }
 
@@ -128,6 +140,12 @@ export function createKindleNav(toc: TocItem[]) {
     .filter((item) => item.level === 1)
     .map((item) => `<li><a href="content.xhtml#${item.id}">${escapeHtml(item.title)}</a></li>`)
     .join("");
+}
+
+export function isChapterTitle(title: string) {
+  return /^(第\s*[一二三四五六七八九十百千万0-9０-９]+章|序章|終章|プロローグ|エピローグ|chapter\s*[0-9０-９]+)/i.test(
+    title.trim(),
+  );
 }
 
 function createToc(lines: string[]): TocItem[] {

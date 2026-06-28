@@ -332,6 +332,36 @@ function App() {
     });
   };
 
+  const applyChapterTitle = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const scrollTop = editor.scrollTop;
+    const lineStart = start === end ? manuscript.lastIndexOf("\n", Math.max(0, start - 1)) + 1 : start;
+    const nextBreak = manuscript.indexOf("\n", end);
+    const lineEnd = start === end ? (nextBreak === -1 ? manuscript.length : nextBreak) : end;
+    const selected = manuscript.slice(lineStart, lineEnd);
+    const replacement = selected
+      .split("\n")
+      .flatMap((line) => {
+        if (!line.trim() || /^\s*\[\[CHAPTER_BREAK\]\]\s*$/i.test(line)) return [line];
+        const leading = line.match(/^\s*/)?.[0] || "";
+        const title = line.replace(/^\s*#{1,6}\s*/, "").trimStart();
+        return [`${leading}[[CHAPTER_BREAK]]`, `${leading}# ${title}`];
+      })
+      .join("\n");
+
+    updateManuscript(`${manuscript.slice(0, lineStart)}${replacement}${manuscript.slice(lineEnd)}`);
+    setStatus("章タイトルにしました");
+    window.requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(lineStart, lineStart + replacement.length);
+      editor.scrollTop = scrollTop;
+    });
+  };
+
   const addRuby = () => {
     const editor = editorRef.current;
     const selected = editor ? manuscript.slice(editor.selectionStart, editor.selectionEnd) : "";
@@ -695,6 +725,10 @@ function App() {
               <div className="tool-buttons primary-tools">
                 <button title="選択行を見出し1にする" onClick={applyHeadingOne}>
                   <Heading1 size={17} aria-hidden />
+                </button>
+                <button className="wide-tool-button" title="選択行を章タイトルにする" onClick={applyChapterTitle}>
+                  <FileText size={17} aria-hidden />
+                  章タイトル
                 </button>
                 <button title="元に戻す" onClick={undoManuscript} disabled={!undoStacks[salesChannel].length}>
                   <Undo2 size={17} aria-hidden />
@@ -1192,9 +1226,13 @@ function paginatePreviewHtml(
   };
 
   blocks.forEach((block) => {
-    if (block.includes('data-page-break="true"')) {
+    if (block.includes('data-page-break="true"') || block.includes('data-chapter-break="true"')) {
       if (reflectManualBreaks) flushPage();
       return;
+    }
+
+    if (reflectManualBreaks && block.includes('data-chapter-start="true"')) {
+      flushPage();
     }
 
     const blockUnits = estimatePreviewBlockUnits(block, typography, direction, target);
@@ -1217,7 +1255,7 @@ function getPreviewPageCapacity(
 ) {
   const fontScale = 16 / typography.fontSize;
   if (direction === "vertical") {
-    return Math.max(8, Math.floor((target === "shimauma" ? 12 : 10) * fontScale));
+    return Math.max(12, Math.floor((target === "shimauma" ? 18 : 16) * fontScale));
   }
 
   return Math.max(14, Math.floor((target === "shimauma" ? 24 : 20) * fontScale));
@@ -1239,11 +1277,11 @@ function estimatePreviewBlockUnits(
   const fontScale = 16 / typography.fontSize;
 
   if (direction === "vertical") {
-    const charsPerColumn = Math.max(16, Math.floor((target === "shimauma" ? 34 : 30) * fontScale));
+    const charsPerColumn = Math.max(22, Math.floor((target === "shimauma" ? 44 : 38) * fontScale));
     const columns = Math.max(1, Math.ceil(textLength / charsPerColumn));
-    if (/^<h1\b/.test(block)) return columns + 2.5;
-    if (/^<h2\b/.test(block)) return columns + 1.5;
-    return columns + 0.8;
+    if (/^<h1\b/.test(block)) return columns + 1.4;
+    if (/^<h2\b/.test(block)) return columns + 0.9;
+    return columns + 0.35;
   }
 
   const charsPerLine = Math.max(12, Math.floor((target === "shimauma" ? 27 : 24) * fontScale));

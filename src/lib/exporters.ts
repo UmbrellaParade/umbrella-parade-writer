@@ -8,6 +8,7 @@ import {
   createKindleNav,
   dataUrlToBytes,
   escapeHtml,
+  isChapterTitle,
   parseMarkdownImageLine,
   stripMarkupForDocx,
 } from "./manuscript";
@@ -105,8 +106,8 @@ function wrapXhtml(
   pageBreaks: PageBreakSettings,
 ) {
   const pageBreakCss = pageBreaks.chapterHead
-    ? ".manual-page-break { break-before: page; page-break-before: always; height: 0; overflow: hidden; }"
-    : ".manual-page-break { display: none; }";
+    ? ".manual-page-break, .chapter-page-break { break-before: page; page-break-before: always; height: 0; overflow: hidden; } h1.chapter-start:not(:first-child) { break-before: page; page-break-before: always; }"
+    : ".manual-page-break, .chapter-page-break { display: none; }";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -169,7 +170,7 @@ async function createDocxChildren(
     .filter((value) => value.length > 0)) {
     const image = parseMarkdownImageLine(line, undefined, rendered.images);
 
-    if (/^\[\[PAGE_BREAK\]\]$/i.test(line.trim())) {
+    if (/^\[\[(PAGE_BREAK|CHAPTER_BREAK)\]\]$/i.test(line.trim())) {
       pendingPageBreak = pageBreaks.chapterHead;
       continue;
     }
@@ -227,12 +228,13 @@ async function createDocxChildren(
     }
 
     if (line.startsWith("# ")) {
+      const title = stripMarkupForDocx(line.replace(/^#\s+/, ""));
       children.push(
         new Paragraph({
           heading: HeadingLevel.HEADING_1,
-          pageBreakBefore: pendingPageBreak,
+          pageBreakBefore: pendingPageBreak || (pageBreaks.chapterHead && children.length > 0 && isChapterTitle(title)),
           spacing: { before: 480, after: 240 },
-          children: [createTextRun(stripMarkupForDocx(line.replace(/^#\s+/, "")), typography, 6)],
+          children: [createTextRun(title, typography, 6)],
         }),
       );
       pendingPageBreak = false;

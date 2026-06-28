@@ -636,6 +636,11 @@ select:focus {
   text-align: center;
 }
 
+.editor-visual .chapter-page-break,
+.preview-page .chapter-page-break {
+  display: none;
+}
+
 .editor-visual .manuscript-image,
 .preview-page .manuscript-image {
   margin: 28px 0;
