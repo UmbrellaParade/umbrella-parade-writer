@@ -1632,10 +1632,10 @@ function getPreviewPageCapacity(
   }
 
   if (direction === "vertical") {
-    return Math.max(8, Math.floor((target === "shimauma" ? 12 : 22) * fontScale));
+    return Math.max(7, Math.floor((target === "shimauma" ? 10 : 22) * fontScale));
   }
 
-  return Math.max(12, Math.floor((target === "shimauma" ? 20 : 32) * fontScale));
+  return Math.max(10, Math.floor((target === "shimauma" ? 16 : 32) * fontScale));
 }
 
 function estimatePreviewBlockUnits(
@@ -1679,10 +1679,10 @@ function getPreviewCharsPerLine(
   }
 
   if (direction === "vertical") {
-    return Math.max(20, Math.floor((target === "shimauma" ? 38 : 44) * fontScale));
+    return Math.max(18, Math.floor((target === "shimauma" ? 34 : 44) * fontScale));
   }
 
-  return Math.max(16, Math.floor((target === "shimauma" ? 26 : 28) * fontScale));
+  return Math.max(14, Math.floor((target === "shimauma" ? 22 : 28) * fontScale));
 }
 
 function splitPreviewBlock(
