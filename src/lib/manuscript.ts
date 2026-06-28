@@ -3,6 +3,7 @@ import type { ImageAsset, ManuscriptImage, RenderedManuscript, TocItem } from ".
 const headingOne = /^#\s+(.+)$/;
 const headingTwo = /^##\s+(.+)$/;
 const inlineTocMarker = /^\[\[TOC\]\]$/i;
+const pageBreakMarker = /^\[\[PAGE_BREAK\]\]$/i;
 const imageLine = /^!\[([^\]]*)\]\((asset:[A-Za-z0-9_-]+|data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
 
 export const sampleManuscript = `# 第一章　傘の下の約束
@@ -49,6 +50,12 @@ export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = [
     if (inlineTocMarker.test(line.trim())) {
       flushParagraph();
       htmlBlocks.push(createInlineToc(toc));
+      return;
+    }
+
+    if (pageBreakMarker.test(line.trim())) {
+      flushParagraph();
+      htmlBlocks.push(`<div class="manual-page-break" data-page-break="true" role="separator">改ページ</div>`);
       return;
     }
 
@@ -99,6 +106,12 @@ export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = [
 
 export function formatInline(escapedText: string): string {
   return escapedText
+    .replace(/\[\[small:([^\]]+)\]\]/g, (_match, text: string) => {
+      return `<span class="inline-size-small">${text}</span>`;
+    })
+    .replace(/\[\[large:([^\]]+)\]\]/g, (_match, text: string) => {
+      return `<span class="inline-size-large">${text}</span>`;
+    })
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, (_match, label: string, url: string) => {
       return `<a href="${url}" target="_blank" rel="noreferrer">${label}</a>`;
     })
@@ -154,6 +167,7 @@ function createInlineToc(toc: TocItem[]) {
 
 export function stripMarkupForDocx(text: string): string {
   return text
+    .replace(/\[\[(small|large):([^\]]+)\]\]/g, "$2")
     .replace(/｜([^《]+)《([^》]+)》/g, "$1（$2）")
     .replace(/([一-龯々ぁ-んァ-ヴーA-Za-z0-9０-９]+)《([^》]+)》/g, "$1（$2）")
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1（$2）");

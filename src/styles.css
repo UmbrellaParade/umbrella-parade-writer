@@ -368,6 +368,10 @@ select:focus {
   padding-right: 4px;
 }
 
+.wide-tool-button {
+  min-width: 92px;
+}
+
 .preview-control-group {
   display: flex;
   align-items: center;
@@ -444,11 +448,22 @@ select:focus {
 }
 
 .editor-pane {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: minmax(220px, 1fr) minmax(180px, 0.82fr);
+  gap: 10px;
+  padding: 10px;
 }
 
-.editor-pane textarea {
+.source-editor {
+  min-height: 0;
+  display: flex;
+  border: 1px solid #e0d5c7;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fffefa;
+}
+
+.source-editor textarea {
   flex: 1 1 auto;
   min-height: 0;
   height: auto;
@@ -462,47 +477,108 @@ select:focus {
   background: transparent;
 }
 
-.preview-page {
-  --page-guide-block: 620px;
-  --page-guide-inline: 380px;
-  padding: 44px;
+.editor-visual {
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid #e0d5c7;
+  border-radius: 8px;
+  padding: 22px;
   font-family: var(--writer-font-family);
   font-size: var(--writer-font-size);
   line-height: 2;
   color: #151311;
-  background-color: #fffefa;
-  background-attachment: local;
+  background: #fffdfa;
   scroll-behavior: smooth;
 }
 
-.preview-page.show-page-guides {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0,
-    transparent calc(var(--page-guide-block) - 2px),
-    rgba(11, 97, 92, 0.16) calc(var(--page-guide-block) - 2px),
-    rgba(11, 97, 92, 0.16) var(--page-guide-block)
-  );
+.preview-page {
+  --sheet-page-gap: 18px;
+  padding: 0;
+  font-family: var(--writer-font-family);
+  font-size: var(--writer-font-size);
+  line-height: 2;
+  color: #151311;
+  background: #eee6da;
+  scroll-behavior: smooth;
 }
 
-.preview-page.vertical.show-page-guides {
-  background-image: repeating-linear-gradient(
-    to left,
-    transparent 0,
-    transparent calc(var(--page-guide-inline) - 2px),
-    rgba(11, 97, 92, 0.16) calc(var(--page-guide-inline) - 2px),
-    rgba(11, 97, 92, 0.16) var(--page-guide-inline)
-  );
+.preview-page:not(.show-page-guides) {
+  padding: 44px;
+  background: #fffefa;
 }
 
+.preview-page-list {
+  display: grid;
+  gap: var(--sheet-page-gap);
+  justify-items: center;
+  align-content: start;
+  min-height: 100%;
+  padding: 18px;
+}
+
+.preview-sheet {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #cdbfaa;
+  border-radius: 4px;
+  background: #fffefa;
+  box-shadow: 0 10px 28px rgba(75, 58, 39, 0.12);
+}
+
+.preview-sheet.kindle {
+  width: min(100%, 500px);
+  min-height: 710px;
+  padding: 44px;
+}
+
+.preview-sheet.shimauma {
+  width: min(100%, 620px);
+  min-height: 878px;
+  padding: 58px 52px;
+  border-color: #9f8b74;
+  box-shadow:
+    inset 0 0 0 24px #fbfaf6,
+    0 12px 30px rgba(75, 58, 39, 0.14);
+}
+
+.preview-sheet.vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+.preview-sheet-body {
+  min-height: 100%;
+}
+
+.page-number {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  z-index: 1;
+  color: #8a7b68;
+  font-family:
+    "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.continuous-preview-body {
+  max-width: 100%;
+}
+
+.editor-visual h1,
+.editor-visual h2,
+.editor-visual p,
 .preview-page h1,
 .preview-page h2,
 .preview-page p {
   margin-top: 0;
 }
 
+.editor-visual h1,
 .preview-page h1 {
   font-size: 1.5rem;
+  font-weight: 700;
   margin-bottom: 0;
   margin-block-end: 32px;
   scroll-margin-block-start: 28px;
@@ -511,47 +587,63 @@ select:focus {
     box-shadow 180ms ease;
 }
 
-.preview-page.break-chapters h1 {
-  break-before: page;
-  page-break-before: always;
-}
-
-.preview-page.break-chapters h1.chapter-heading:not(:first-of-type) {
-  margin-top: 0;
-  margin-block-start: 72px;
-  padding-top: 0;
-  padding-block-start: 36px;
-  border-top: 0;
-  border-block-start: 1px dashed #c9bcaa;
-}
-
+.editor-visual h2,
 .preview-page h2 {
   font-size: 1.14rem;
+  font-weight: 700;
   margin-bottom: 0;
   margin-block-end: 24px;
 }
 
+.editor-visual p,
 .preview-page p {
   margin-bottom: 0;
   margin-block-end: 1.4em;
 }
 
+.editor-visual ruby rt,
 .preview-page ruby rt {
   font-size: 0.5em;
   color: #201b16;
 }
 
+.editor-visual .inline-size-small,
+.preview-page .inline-size-small {
+  font-size: 0.86em;
+}
+
+.editor-visual .inline-size-large,
+.preview-page .inline-size-large {
+  font-size: 1.18em;
+}
+
+.editor-visual .jump-highlight,
 .preview-page .jump-highlight {
   background: rgba(255, 218, 112, 0.34);
   box-shadow: 0 0 0 8px rgba(255, 218, 112, 0.2);
 }
 
+.editor-visual .manual-page-break,
+.preview-page .manual-page-break {
+  margin: 28px 0;
+  border-block-start: 1px dashed #b7a58f;
+  color: #7b6a56;
+  font-family:
+    "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.editor-visual .manuscript-image,
 .preview-page .manuscript-image {
   margin: 28px 0;
   text-align: center;
   writing-mode: horizontal-tb;
 }
 
+.editor-visual .manuscript-image img,
 .preview-page .manuscript-image img {
   display: inline-block;
   max-width: 100%;
@@ -560,6 +652,7 @@ select:focus {
   border-radius: 6px;
 }
 
+.editor-visual .manuscript-image figcaption,
 .preview-page .manuscript-image figcaption {
   margin-top: 8px;
   font-family:
@@ -568,29 +661,35 @@ select:focus {
   color: #6b5b48;
 }
 
+.editor-visual .manuscript-toc,
 .preview-page .manuscript-toc {
   margin: 0 0 2em;
   padding: 0;
   writing-mode: inherit;
 }
 
+.editor-visual .manuscript-toc h2,
 .preview-page .manuscript-toc h2 {
   margin-bottom: 0.8em;
 }
 
+.editor-visual .manuscript-toc ol,
 .preview-page .manuscript-toc ol {
   margin: 0;
   padding-inline-start: 1.5em;
 }
 
+.editor-visual .manuscript-toc li,
 .preview-page .manuscript-toc li {
   margin-bottom: 0.35em;
 }
 
+.editor-visual .manuscript-toc .toc-level-2,
 .preview-page .manuscript-toc .toc-level-2 {
   margin-inline-start: 1em;
 }
 
+.editor-visual .manuscript-toc a,
 .preview-page .manuscript-toc a {
   color: #0b61d8;
   text-decoration: underline;
@@ -600,22 +699,21 @@ select:focus {
 .preview-page.vertical {
   writing-mode: vertical-rl;
   text-orientation: mixed;
+}
+
+.preview-page:not(.show-page-guides).vertical {
   padding: 36px 42px;
 }
 
-.preview-page.kindle {
+.preview-page:not(.show-page-guides).kindle {
   max-width: 500px;
-  --page-guide-block: 620px;
-  --page-guide-inline: 380px;
   margin-inline: auto;
   box-shadow: inset 0 0 0 10px #f8f5ef;
 }
 
-.preview-page.shimauma {
+.preview-page:not(.show-page-guides).shimauma {
   aspect-ratio: 0.706;
   max-width: 620px;
-  --page-guide-block: 878px;
-  --page-guide-inline: 438px;
   margin-inline: auto;
   border-color: #9f8b74;
   box-shadow: inset 0 0 0 26px #fbfaf6;
@@ -1028,8 +1126,9 @@ select:focus {
     flex-wrap: wrap;
   }
 
-  .preview-page,
-  .editor-pane textarea {
+  .preview-page:not(.show-page-guides),
+  .source-editor textarea,
+  .editor-visual {
     padding: 20px;
   }
 

@@ -138,6 +138,10 @@ function App() {
   const manuscript = manuscripts[salesChannel] ?? sampleManuscript;
   const previewTarget = salesChannel;
   const rendered = useMemo(() => renderManuscript(manuscript, imageAssets), [imageAssets, manuscript]);
+  const previewPages = useMemo(
+    () => paginatePreviewHtml(rendered.html, typography, direction, previewTarget, pageBreaks.chapterHead),
+    [direction, pageBreaks.chapterHead, previewTarget, rendered.html, typography],
+  );
   const typographyStyle = useMemo(
     () =>
       ({
@@ -348,6 +352,18 @@ function App() {
 
   const insertInlineToc = () => {
     insertAtSelection("\n\n[[TOC]]\n\n");
+  };
+
+  const insertPageBreak = () => {
+    insertAtSelection("\n\n[[PAGE_BREAK]]\n\n");
+    setStatus("改ページを挿入しました");
+  };
+
+  const applyInlineSize = (size: "small" | "large") => {
+    const editor = editorRef.current;
+    const selected = editor ? manuscript.slice(editor.selectionStart, editor.selectionEnd) : "";
+    const fallback = size === "small" ? "小さめ文字" : "大きめ文字";
+    insertAtSelection(`[[${size}:${selected || fallback}]]`, selected ? 0 : 2);
   };
 
   const insertManuscriptImage = (event: ChangeEvent<HTMLInputElement>) => {
@@ -689,6 +705,12 @@ function App() {
                 <button title="ルビを振る" onClick={addRuby}>
                   <Type size={17} aria-hidden />
                 </button>
+                <button title="選択文字を小さくする" onClick={() => applyInlineSize("small")}>
+                  小
+                </button>
+                <button title="選択文字を大きくする" onClick={() => applyInlineSize("large")}>
+                  大
+                </button>
                 <button
                   title={salesChannel === "kindle" ? "Kindle用リンクを埋め込む" : "紙面ではQR案内も確認してください"}
                   onClick={addLink}
@@ -697,6 +719,10 @@ function App() {
                 </button>
                 <button title="本文目次を挿入" onClick={insertInlineToc}>
                   <ListTree size={17} aria-hidden />
+                </button>
+                <button className="wide-tool-button" title="改ページを挿入" onClick={insertPageBreak}>
+                  <FileText size={17} aria-hidden />
+                  改ページ
                 </button>
                 <button title="画像を挿入" onClick={() => manuscriptImageInputRef.current?.click()}>
                   <ImageIcon size={17} aria-hidden />
@@ -734,7 +760,7 @@ function App() {
                       }))
                     }
                   />
-                  章頭改ページ
+                  改ページ反映
                 </label>
                 <label className="toggle-control">
                   <input
@@ -802,47 +828,67 @@ function App() {
             </div>
 
             <div className="editor-pane">
-              <textarea
-                ref={editorRef}
-                value={manuscript}
-                spellCheck={false}
-                onChange={(event) => {
-                  setStatus("編集中");
-                  updateManuscript(event.target.value);
-                }}
-                onPaste={handleEditorPaste}
-                onKeyDown={(event) => {
-                  const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
-                  const isRedo =
-                    (event.ctrlKey || event.metaKey) &&
-                    (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
-                  const isCut = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
+              <div className="source-editor">
+                <textarea
+                  ref={editorRef}
+                  value={manuscript}
+                  spellCheck={false}
+                  onChange={(event) => {
+                    setStatus("編集中");
+                    updateManuscript(event.target.value);
+                  }}
+                  onPaste={handleEditorPaste}
+                  onKeyDown={(event) => {
+                    const isUndo =
+                      (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
+                    const isRedo =
+                      (event.ctrlKey || event.metaKey) &&
+                      (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
+                    const isCut = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
 
-                  if (isUndo) {
-                    event.preventDefault();
-                    undoManuscript();
-                  }
+                    if (isUndo) {
+                      event.preventDefault();
+                      undoManuscript();
+                    }
 
-                  if (isRedo) {
-                    event.preventDefault();
-                    redoManuscript();
-                  }
+                    if (isRedo) {
+                      event.preventDefault();
+                      redoManuscript();
+                    }
 
-                  if (isCut && cutSelection()) {
-                    event.preventDefault();
-                  }
-                }}
+                    if (isCut && cutSelection()) {
+                      event.preventDefault();
+                    }
+                  }}
+                />
+              </div>
+              <div
+                className={`editor-visual ${direction}`}
+                onClick={handlePreviewClick}
+                dangerouslySetInnerHTML={{ __html: rendered.html }}
               />
             </div>
 
             <article
               ref={previewRef}
-              className={`preview-page ${direction} ${previewTarget} ${pageBreaks.chapterHead ? "break-chapters" : ""} ${
+              className={`preview-page ${direction} ${previewTarget} ${pageBreaks.chapterHead ? "reflect-page-breaks" : ""} ${
                 pageBreaks.pageGuide ? "show-page-guides" : ""
               }`}
               onClick={handlePreviewClick}
-              dangerouslySetInnerHTML={{ __html: rendered.html }}
-            />
+            >
+              {pageBreaks.pageGuide ? (
+                <div className="preview-page-list">
+                  {previewPages.map((page) => (
+                    <section className={`preview-sheet ${direction} ${previewTarget}`} key={page.pageNumber}>
+                      <div className="preview-sheet-body" dangerouslySetInnerHTML={{ __html: page.html }} />
+                      <span className="page-number">{page.pageNumber}</span>
+                    </section>
+                  ))}
+                </div>
+              ) : (
+                <div className="continuous-preview-body" dangerouslySetInnerHTML={{ __html: rendered.html }} />
+              )}
+            </article>
           </section>
         )}
 
@@ -1112,6 +1158,107 @@ function App() {
       </main>
     </div>
   );
+}
+
+type PreviewPage = {
+  html: string;
+  pageNumber: number;
+};
+
+function paginatePreviewHtml(
+  html: string,
+  typography: TypographySettings,
+  direction: WritingDirection,
+  target: SalesChannel,
+  reflectManualBreaks: boolean,
+): PreviewPage[] {
+  const blocks = html
+    .split("\n")
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const capacity = getPreviewPageCapacity(typography, direction, target);
+  const pages: PreviewPage[] = [];
+  let currentBlocks: string[] = [];
+  let currentUnits = 0;
+
+  const flushPage = () => {
+    if (!currentBlocks.length) return;
+    pages.push({
+      html: currentBlocks.join("\n"),
+      pageNumber: pages.length + 1,
+    });
+    currentBlocks = [];
+    currentUnits = 0;
+  };
+
+  blocks.forEach((block) => {
+    if (block.includes('data-page-break="true"')) {
+      if (reflectManualBreaks) flushPage();
+      return;
+    }
+
+    const blockUnits = estimatePreviewBlockUnits(block, typography, direction, target);
+    if (currentBlocks.length && currentUnits + blockUnits > capacity) {
+      flushPage();
+    }
+
+    currentBlocks.push(block);
+    currentUnits += blockUnits;
+  });
+
+  flushPage();
+  return pages.length ? pages : [{ html: "", pageNumber: 1 }];
+}
+
+function getPreviewPageCapacity(
+  typography: TypographySettings,
+  direction: WritingDirection,
+  target: SalesChannel,
+) {
+  const fontScale = 16 / typography.fontSize;
+  if (direction === "vertical") {
+    return Math.max(8, Math.floor((target === "shimauma" ? 12 : 10) * fontScale));
+  }
+
+  return Math.max(14, Math.floor((target === "shimauma" ? 24 : 20) * fontScale));
+}
+
+function estimatePreviewBlockUnits(
+  block: string,
+  typography: TypographySettings,
+  direction: WritingDirection,
+  target: SalesChannel,
+) {
+  if (block.includes("manuscript-image")) return target === "shimauma" ? 13 : 11;
+  if (block.includes("manuscript-toc")) {
+    const entryCount = (block.match(/toc-level-/g) || []).length;
+    return Math.max(4, Math.ceil(entryCount * 0.85) + 2);
+  }
+
+  const textLength = getVisibleTextLength(block);
+  const fontScale = 16 / typography.fontSize;
+
+  if (direction === "vertical") {
+    const charsPerColumn = Math.max(16, Math.floor((target === "shimauma" ? 34 : 30) * fontScale));
+    const columns = Math.max(1, Math.ceil(textLength / charsPerColumn));
+    if (/^<h1\b/.test(block)) return columns + 2.5;
+    if (/^<h2\b/.test(block)) return columns + 1.5;
+    return columns + 0.8;
+  }
+
+  const charsPerLine = Math.max(12, Math.floor((target === "shimauma" ? 27 : 24) * fontScale));
+  const lines = Math.max(1, Math.ceil(textLength / charsPerLine));
+  if (/^<h1\b/.test(block)) return lines + 2.8;
+  if (/^<h2\b/.test(block)) return lines + 1.8;
+  return lines + 0.7;
+}
+
+function getVisibleTextLength(html: string) {
+  return html
+    .replace(/<rt\b[^>]*>.*?<\/rt>/gi, "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&[a-z#0-9]+;/gi, "あ")
+    .replace(/\s/g, "").length;
 }
 
 function loadInitialDraft() {

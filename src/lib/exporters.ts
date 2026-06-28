@@ -104,9 +104,9 @@ function wrapXhtml(
   typography: TypographySettings,
   pageBreaks: PageBreakSettings,
 ) {
-  const chapterBreakCss = pageBreaks.chapterHead
-    ? "h1 { break-before: page; page-break-before: always; font-size: 1.5em; }"
-    : "h1 { font-size: 1.5em; }";
+  const pageBreakCss = pageBreaks.chapterHead
+    ? ".manual-page-break { break-before: page; page-break-before: always; height: 0; overflow: hidden; }"
+    : ".manual-page-break { display: none; }";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
@@ -117,7 +117,10 @@ function wrapXhtml(
     <style>
       body { font-family: ${epubFontFamily(typography)}; font-size: ${typography.fontSize}px; line-height: 1.8; }
       a { color: #0b61d8; text-decoration: underline; }
-      ${chapterBreakCss}
+      h1 { font-size: 1.5em; }
+      ${pageBreakCss}
+      .inline-size-small { font-size: 0.86em; }
+      .inline-size-large { font-size: 1.18em; }
       .manuscript-toc { margin: 1.5em 0 2em; }
       .manuscript-toc ol { padding-inline-start: 1.5em; }
       .manuscript-toc .toc-level-2 { margin-inline-start: 1em; }
@@ -157,7 +160,7 @@ async function createDocxChildren(
   pageBreaks: PageBreakSettings,
 ) {
   const children: Paragraph[] = [];
-  let seenHeadingOne = false;
+  let pendingPageBreak = false;
 
   for (const line of markdown
     .replace(/\r\n/g, "\n")
@@ -166,6 +169,11 @@ async function createDocxChildren(
     .filter((value) => value.length > 0)) {
     const image = parseMarkdownImageLine(line, undefined, rendered.images);
 
+    if (/^\[\[PAGE_BREAK\]\]$/i.test(line.trim())) {
+      pendingPageBreak = pageBreaks.chapterHead;
+      continue;
+    }
+
     if (image?.src.startsWith("data:image/")) {
       const size = await getDataImageSize(image.src);
       const maxWidth = 420;
@@ -173,6 +181,7 @@ async function createDocxChildren(
       children.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
+          pageBreakBefore: pendingPageBreak,
           spacing: { before: 240, after: 240 },
           children: [
             new ImageRun({
@@ -191,6 +200,7 @@ async function createDocxChildren(
           ],
         }),
       );
+      pendingPageBreak = false;
       continue;
     }
 
@@ -198,10 +208,12 @@ async function createDocxChildren(
       children.push(
         new Paragraph({
           heading: HeadingLevel.HEADING_2,
+          pageBreakBefore: pendingPageBreak,
           spacing: { before: 360, after: 180 },
           children: [createTextRun("目次", typography, 2)],
         }),
       );
+      pendingPageBreak = false;
       rendered.toc.forEach((item) => {
         children.push(
           new Paragraph({
@@ -218,12 +230,12 @@ async function createDocxChildren(
       children.push(
         new Paragraph({
           heading: HeadingLevel.HEADING_1,
-          pageBreakBefore: pageBreaks.chapterHead && seenHeadingOne,
-          spacing: { before: seenHeadingOne ? 0 : 480, after: 240 },
+          pageBreakBefore: pendingPageBreak,
+          spacing: { before: 480, after: 240 },
           children: [createTextRun(stripMarkupForDocx(line.replace(/^#\s+/, "")), typography, 6)],
         }),
       );
-      seenHeadingOne = true;
+      pendingPageBreak = false;
       continue;
     }
 
@@ -231,19 +243,23 @@ async function createDocxChildren(
       children.push(
         new Paragraph({
           heading: HeadingLevel.HEADING_2,
+          pageBreakBefore: pendingPageBreak,
           spacing: { before: 360, after: 180 },
           children: [createTextRun(stripMarkupForDocx(line.replace(/^##\s+/, "")), typography, 3)],
         }),
       );
+      pendingPageBreak = false;
       continue;
     }
 
     children.push(
       new Paragraph({
+        pageBreakBefore: pendingPageBreak,
         spacing: { line: 360, after: 160 },
         children: [createTextRun(stripMarkupForDocx(line), typography)],
       }),
     );
+    pendingPageBreak = false;
   }
 
   return children;
