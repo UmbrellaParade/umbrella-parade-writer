@@ -690,11 +690,14 @@ select:focus {
 .preview-sheet {
   flex: 0 0 auto;
   position: relative;
+  min-width: 0;
   overflow: hidden;
   border: 1px solid #cdbfaa;
   border-radius: 4px;
   background: #fffefa;
+  overflow-wrap: anywhere;
   box-shadow: 0 10px 28px rgba(75, 58, 39, 0.12);
+  word-break: break-word;
 }
 
 .preview-sheet.kindle {
@@ -726,7 +729,10 @@ select:focus {
 
 .preview-sheet-body {
   max-width: 100%;
+  min-width: 0;
   min-height: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .page-number {
@@ -747,8 +753,13 @@ select:focus {
 
 .preview-page h1,
 .preview-page h2,
-.preview-page p {
+.preview-page p,
+.preview-page li {
+  max-width: 100%;
   margin-top: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .preview-page h1 {
@@ -879,7 +890,7 @@ select:focus {
 
 .preview-page a {
   overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: break-all;
 }
 
 .preview-page:not(.show-page-guides).vertical {
