@@ -349,6 +349,7 @@
       <div class="section">
         <div class="actions">
           <button class="primary" id="refresh">Docsから更新</button>
+          <button id="open-wide">大きく開く</button>
         </div>
       </div>
 
@@ -471,6 +472,7 @@
       });
 
       document.getElementById('refresh').addEventListener('click', refreshSnapshot);
+      document.getElementById('open-wide').addEventListener('click', openWidePreview);
       document.getElementById('read-selection').addEventListener('click', readSelection);
       document.getElementById('insert-ruby').addEventListener('click', insertRuby);
       document.getElementById('insert-link').addEventListener('click', insertLink);
@@ -515,6 +517,14 @@
           })
           .withFailureHandler((error) => setStatus(error.message || '読み込みに失敗しました'))
           .getDocumentSnapshot();
+      }
+
+      function openWidePreview() {
+        setStatus('大きい表示を開いています...');
+        google.script.run
+          .withSuccessHandler(() => setStatus('大きい表示を開きました'))
+          .withFailureHandler((error) => setStatus(error.message || '大きい表示を開けませんでした'))
+          .showWidePreview();
       }
 
       function readSelection() {
