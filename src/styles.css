@@ -648,6 +648,12 @@ select:focus {
   color: #151311;
   background: #eee6da;
   scroll-behavior: smooth;
+  overscroll-behavior: contain;
+}
+
+.preview-page.show-page-guides {
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 .preview-page:not(.show-page-guides) {
@@ -682,7 +688,7 @@ select:focus {
 .preview-sheet {
   flex: 0 0 auto;
   position: relative;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid #cdbfaa;
   border-radius: 4px;
   background: #fffefa;

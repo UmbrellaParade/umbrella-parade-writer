@@ -300,22 +300,27 @@ function App() {
       const data = event.data;
       if (data?.source !== "umbrella-parade-docs-addon" || data.type !== "docsSnapshot" || !data.snapshot) return;
 
-      const channel = data.target === "shimauma" ? "shimauma" : "kindle";
-      const nextDirection = data.direction === "vertical" ? "vertical" : "horizontal";
+      const channel = data.target === "kindle" || data.target === "shimauma" ? data.target : undefined;
+      const nextDirection = data.direction === "vertical" || data.direction === "horizontal" ? data.direction : undefined;
       const nextManuscript = convertDocsSnapshotToManuscript(data.snapshot);
       const receivedAt = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
       setDocsBridgeActive(true);
       setDocsBridgeStatus(`Docsから受信 ${receivedAt}`);
       if (data.snapshot.title) setTitle(data.snapshot.title);
-      setSalesChannel(channel);
-      setDirection(nextDirection);
+      if (channel) setSalesChannel(channel);
+      if (nextDirection) setDirection(nextDirection);
       setActiveTab("write");
       setUndoStacks(createEmptyHistory());
       setRedoStacks(createEmptyHistory());
       setManuscripts((current) => ({
         ...current,
-        [channel]: nextManuscript,
+        ...(channel
+          ? { [channel]: nextManuscript }
+          : {
+              kindle: nextManuscript,
+              shimauma: nextManuscript,
+            }),
       }));
     };
 
@@ -793,11 +798,17 @@ function App() {
   const handlePreviewWheel = (event: WheelEvent<HTMLElement>) => {
     const preview = previewRef.current;
     if (!preview || !pageBreaks.pageGuide || preview.scrollWidth <= preview.clientWidth) return;
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
 
     event.preventDefault();
-    const delta = direction === "vertical" ? -event.deltaY : event.deltaY;
+    event.stopPropagation();
+
+    const dominantDelta =
+      Math.abs(event.deltaX) > Math.abs(event.deltaY)
+        ? event.deltaX
+        : event.deltaY;
+    const delta = direction === "vertical" ? -dominantDelta : dominantDelta;
     preview.scrollBy({ left: delta, behavior: "auto" });
+    preview.scrollTop = 0;
   };
 
   const focusEditorHeading = (id: string) => {
@@ -1227,7 +1238,7 @@ function App() {
                 pageBreaks.pageGuide ? "show-page-guides" : ""
               }`}
               onClick={handlePreviewClick}
-              onWheel={handlePreviewWheel}
+              onWheelCapture={handlePreviewWheel}
             >
               {pageBreaks.pageGuide ? (
                 <div className="preview-page-list">

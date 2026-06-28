@@ -3,7 +3,7 @@ const ADDON_NAME = 'Umbrella Parade Writer';
 function onOpen() {
   DocumentApp.getUi()
     .createMenu('Umbrella Parade')
-    .addItem('サイドバーを開く', 'showSidebar')
+    .addItem('Writerを開く / 同期', 'showSidebar')
     .addSeparator()
     .addItem('選択文字にルビ記法を入れる', 'showRubyPrompt')
     .addToUi();

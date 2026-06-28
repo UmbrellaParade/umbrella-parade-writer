@@ -15,24 +15,29 @@
 
       body {
         margin: 0;
-        padding: 10px;
+        padding: 12px;
         background: #f7f3ec;
       }
 
-      button,
-      input,
-      textarea,
-      select {
-        font: inherit;
+      h1,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 8px;
+        font-size: 18px;
       }
 
       button {
+        min-height: 38px;
         border: 1px solid #c9bba7;
         border-radius: 7px;
         padding: 8px 10px;
         color: #1f1a15;
         background: #fffdf8;
         cursor: pointer;
+        font: inherit;
       }
 
       button.primary {
@@ -41,90 +46,28 @@
         background: #2d5f8b;
       }
 
-      button:disabled {
-        cursor: not-allowed;
-        opacity: 0.55;
-      }
-
-      h1,
-      h2,
-      h3,
-      p {
-        margin-top: 0;
-      }
-
-      h1 {
-        margin-bottom: 6px;
-        font-size: 18px;
-      }
-
-      h2 {
-        margin: 0 0 10px;
-        font-size: 14px;
-      }
-
-      label {
-        display: grid;
-        gap: 5px;
-        margin-bottom: 10px;
-        font-size: 12px;
-        font-weight: 700;
-      }
-
-      input,
-      textarea,
-      select {
-        width: 100%;
-        border: 1px solid #cbbda8;
-        border-radius: 7px;
-        padding: 8px;
-        background: #fffefb;
-      }
-
-      textarea {
-        min-height: 74px;
-        resize: vertical;
-      }
-
-      .section {
-        margin-bottom: 10px;
-        border: 1px solid #ddd1bf;
-        border-radius: 8px;
-        padding: 10px;
-        background: rgba(255, 253, 248, 0.92);
-      }
-
-      .tabs,
-      .segmented,
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 7px;
-      }
-
-      .tabs {
-        margin-bottom: 10px;
-      }
-
-      .tabs button.active,
-      .segmented button.active {
-        border-color: #2d5f8b;
-        color: #fff;
-        background: #2d5f8b;
-      }
-
-      .muted {
-        color: #746754;
-        font-size: 12px;
-        line-height: 1.6;
-      }
-
       .status {
         min-height: 20px;
-        margin: 0 0 10px;
+        margin: 0 0 12px;
         color: #2d5f8b;
         font-size: 12px;
         font-weight: 700;
+        line-height: 1.6;
+      }
+
+      .panel {
+        display: grid;
+        gap: 10px;
+        border: 1px solid #ddd1bf;
+        border-radius: 8px;
+        padding: 12px;
+        background: rgba(255, 253, 248, 0.94);
+      }
+
+      .actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 8px;
       }
 
       .stats {
@@ -134,425 +77,108 @@
       }
 
       .stat {
+        min-height: 44px;
+        display: grid;
+        place-items: center;
         border-radius: 7px;
-        padding: 9px;
+        padding: 8px;
         background: #efe6d7;
+        color: #44382b;
+        font-size: 11px;
+        font-weight: 700;
+        text-align: center;
       }
 
       .stat strong {
         display: block;
-        font-size: 16px;
+        font-size: 15px;
       }
 
-      .toc-list {
-        display: grid;
-        gap: 5px;
-      }
-
-      .toc-list a {
-        display: block;
-        color: #0b61d8;
-        text-decoration: underline;
-        cursor: pointer;
-      }
-
-      .toc-list .level-2 {
-        padding-left: 14px;
-      }
-
-      .toc-list .level-3 {
-        padding-left: 28px;
-      }
-
-      .preview-wrap {
-        overflow: auto;
-        max-height: calc(100vh - 210px);
-        min-height: 260px;
-        padding: 10px;
-        background: #e8dfd1;
-      }
-
-      .page-list {
-        display: flex;
-        gap: 12px;
-        min-width: max-content;
-      }
-
-      .page-list.vertical {
-        flex-direction: row-reverse;
-      }
-
-      .page {
-        position: relative;
-        flex: 0 0 auto;
-        overflow: auto;
-        width: 230px;
-        min-height: 360px;
-        border: 1px solid #bfae98;
-        border-radius: 4px;
-        padding: 18px;
-        background: #fffefa;
-        box-shadow: 0 8px 20px rgba(70, 55, 38, 0.12);
-        font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
-        line-height: 1.8;
-      }
-
-      .page.kindle {
-        width: 214px;
-        min-height: 362px;
-        padding: 12px;
-        font-size: 11px;
-        line-height: 1.55;
-      }
-
-      .page.shimauma {
-        width: 248px;
-        min-height: 352px;
-        padding: 24px;
+      .muted {
+        margin: 0;
+        color: #746754;
         font-size: 12px;
-      }
-
-      .page.vertical {
-        width: 250px;
-        min-height: 360px;
-        writing-mode: vertical-rl;
-        text-orientation: mixed;
-      }
-
-      .page h1 {
-        font-size: 1.35em;
-        margin-bottom: 1.2em;
-      }
-
-      .page h2 {
-        font-size: 1.15em;
-        margin-bottom: 1em;
-      }
-
-      .page p {
-        margin-bottom: 1em;
-        white-space: pre-wrap;
-      }
-
-      .page a,
-      .doc-toc a {
-        color: #0b61d8;
-        text-decoration: underline;
-      }
-
-      .doc-toc {
-        border: 1px solid #ded2c0;
-        border-radius: 6px;
-        padding: 12px;
-        background: #fffdf8;
-        font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
-      }
-
-      .doc-toc h2 {
-        margin-bottom: 8px;
-      }
-
-      .doc-toc a {
-        display: block;
-        margin-bottom: 6px;
-        cursor: pointer;
-      }
-
-      .doc-toc .level-2 {
-        padding-left: 14px;
-      }
-
-      .doc-toc .level-3 {
-        padding-left: 28px;
-      }
-
-      .page-number {
-        position: absolute;
-        right: 8px;
-        bottom: 6px;
-        color: #8a7b68;
-        font: 700 10px system-ui, sans-serif;
-      }
-
-      .link-list {
-        display: grid;
-        gap: 6px;
-      }
-
-      .link-list a {
-        color: #0b61d8;
-        text-decoration: underline;
-      }
-
-      .aplus-item {
-        border-top: 1px solid #e1d5c4;
-        padding-top: 12px;
-      }
-
-      .aplus-preview {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .aplus-card {
-        border: 1px solid #d6cab8;
-        border-radius: 8px;
-        padding: 8px;
-        background: #fffefa;
-      }
-
-      .aplus-card img,
-      .image-placeholder {
-        width: 100%;
-        aspect-ratio: 1 / 1;
-        border-radius: 6px;
-        object-fit: cover;
-        background: #eee4d7;
-      }
-
-      .image-placeholder {
-        display: grid;
-        place-items: center;
-        color: #827360;
-        font-weight: 700;
-      }
-
-      .aplus-card h3 {
-        margin: 8px 0 4px;
-        font-size: 12px;
-      }
-
-      .aplus-card p {
-        margin-bottom: 5px;
-        font-size: 11px;
-        line-height: 1.55;
-      }
-
-      .count {
-        color: #827360;
-        font-weight: 400;
-      }
-
-      .preview-toolbar {
-        display: grid;
-        gap: 8px;
-      }
-
-      .auto-sync-active {
-        border-color: #0b615c;
-        color: #0b615c;
-        background: #e7f1ed;
-        font-weight: 700;
+        line-height: 1.6;
       }
     </style>
   </head>
   <body>
     <h1>Umbrella Parade Writer</h1>
-    <p id="status" class="status">読み込み中...</p>
+    <p id="status" class="status">別画面Writerを開いています...</p>
 
-    <div class="tabs" aria-label="tabs">
-      <button class="active" data-tab="preview">プレビュー</button>
-      <button data-tab="ruby">ルビ</button>
-      <button data-tab="check">確認</button>
-      <button data-tab="aplus">A+</button>
-    </div>
-
-    <section id="tab-preview" class="tab-panel">
-      <div class="section preview-toolbar">
-        <div class="actions">
-          <button class="primary" id="refresh">サイドバー更新</button>
-          <button id="open-external">別画面で開く</button>
-          <button id="sync-external">別画面へ同期</button>
-          <button id="auto-refresh" aria-pressed="false">自動更新OFF</button>
-        </div>
+    <section class="panel">
+      <div class="actions">
+        <button class="primary" id="sync-external">別画面へ同期</button>
+        <button id="open-external">別画面で開く</button>
       </div>
 
-      <div class="section">
-        <h2>プレビュー</h2>
-        <div class="segmented" aria-label="preview target">
-          <button class="active" data-target="kindle">Kindle</button>
-          <button data-target="shimauma">しまうま</button>
-        </div>
-        <div class="segmented" aria-label="writing direction" style="margin-top: 8px;">
-          <button class="active" data-direction="horizontal">横書き</button>
-          <button data-direction="vertical">縦書き</button>
-        </div>
+      <div class="stats" aria-label="原稿情報">
+        <div class="stat"><strong id="stat-chars">0</strong>文字</div>
+        <div class="stat"><strong id="stat-headings">0</strong>見出し</div>
+        <div class="stat"><strong id="stat-links">0</strong>リンク</div>
       </div>
 
-      <div class="preview-wrap">
-        <div id="preview" class="page-list"></div>
-      </div>
-    </section>
-
-    <section id="tab-ruby" class="tab-panel" hidden>
-      <div class="section">
-        <h2>ルビ記法</h2>
-        <p class="muted">Docs本文には ｜漢字《かんじ》 の形で入れます。プレビューではルビとして表示します。</p>
-        <div class="actions" style="margin-bottom: 10px;">
-          <button id="read-selection">選択文字を取得</button>
-        </div>
-        <label>
-          文字
-          <input id="ruby-base" placeholder="例：雨音">
-        </label>
-        <label>
-          ふりがな
-          <input id="ruby-text" placeholder="例：あまおと">
-        </label>
-        <button class="primary" id="insert-ruby">ルビ記法を挿入</button>
-      </div>
-
-      <div class="section">
-        <h2>Kindle用リンク</h2>
-        <label>
-          表示文字
-          <input id="link-label" placeholder="例：記録室はこちら">
-        </label>
-        <label>
-          URL
-          <input id="link-url" placeholder="https://">
-        </label>
-        <button id="insert-link">カーソル位置にリンクを挿入</button>
-      </div>
-    </section>
-
-    <section id="tab-check" class="tab-panel" hidden>
-      <div class="section">
-        <h2>原稿チェック</h2>
-        <div class="stats">
-          <div class="stat"><strong id="stat-chars">0</strong>文字</div>
-          <div class="stat"><strong id="stat-headings">0</strong>見出し</div>
-          <div class="stat"><strong id="stat-links">0</strong>リンク</div>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>目次</h2>
-        <div id="toc" class="toc-list"></div>
-      </div>
-
-      <div class="section">
-        <h2>リンク</h2>
-        <div id="links" class="link-list"></div>
-      </div>
-    </section>
-
-    <section id="tab-aplus" class="tab-panel" hidden>
-      <div class="section">
-        <h2>A+ 4枠</h2>
-        <p class="muted">各画像は300px x 300px以上を想定。画像・代替テキスト・キャプション・見出し・説明をまとめて確認できます。</p>
-        <div id="aplus-editors"></div>
-        <div class="actions">
-          <button class="primary" id="download-aplus">A+プレビューPNG</button>
-          <button id="clear-aplus">A+入力をクリア</button>
-        </div>
-      </div>
-
-      <div class="section">
-        <h2>A+プレビュー</h2>
-        <div id="aplus-preview" class="aplus-preview"></div>
-      </div>
+      <p class="muted">Docs本文の確認は別画面Writerで行います。このパネルは同期だけに使います。</p>
     </section>
 
     <script>
-      const state = {
-        snapshot: null,
-        target: 'kindle',
-        direction: 'horizontal',
-        activeTab: 'preview',
-        aplus: loadAplus(),
-      };
-
       const WRITER_URL = 'https://umbrellaparade.github.io/umbrella-parade-writer/?docsBridge=1';
       const WRITER_ORIGIN = 'https://umbrellaparade.github.io';
-      const AUTO_REFRESH_MS = 5000;
       let writerWindow = null;
-      let autoRefreshTimer = 0;
+      let snapshot = null;
       let isRefreshing = false;
       let pendingRefresh = false;
 
       const statusEl = document.getElementById('status');
 
-      document.querySelectorAll('.tabs button').forEach((button) => {
-        button.addEventListener('click', () => setTab(button.dataset.tab));
-      });
-
-      document.querySelectorAll('[data-target]').forEach((button) => {
-        button.addEventListener('click', () => {
-          state.target = button.dataset.target;
-          updateActiveButtons('[data-target]', state.target);
-          renderPreview();
-          postSnapshotToWriter();
-        });
-      });
-
-      document.querySelectorAll('[data-direction]').forEach((button) => {
-        button.addEventListener('click', () => {
-          state.direction = button.dataset.direction;
-          updateActiveButtons('[data-direction]', state.direction);
-          renderPreview();
-          postSnapshotToWriter();
-        });
-      });
-
-      document.getElementById('refresh').addEventListener('click', refreshSnapshot);
-      document.getElementById('open-external').addEventListener('click', openExternalWriter);
+      document.getElementById('open-external').addEventListener('click', () => openExternalWriter({ userAction: true }));
       document.getElementById('sync-external').addEventListener('click', syncExternalWriter);
-      document.getElementById('auto-refresh').addEventListener('click', toggleAutoRefresh);
-      document.getElementById('read-selection').addEventListener('click', readSelection);
-      document.getElementById('insert-ruby').addEventListener('click', insertRuby);
-      document.getElementById('insert-link').addEventListener('click', insertLink);
-      document.getElementById('download-aplus').addEventListener('click', downloadAplus);
-      document.getElementById('clear-aplus').addEventListener('click', () => {
-        state.aplus = createDefaultAplus();
-        saveAplus();
-        renderAplus();
-      });
 
-      refreshSnapshot();
-      renderAplus();
+      openExternalWriter({ userAction: false });
+      refreshSnapshot({ postAfterLoad: true });
 
       function setStatus(message) {
         statusEl.textContent = message;
       }
 
-      function setTab(tab) {
-        state.activeTab = tab;
-        document.querySelectorAll('.tabs button').forEach((button) => {
-          button.classList.toggle('active', button.dataset.tab === tab);
-        });
-        document.querySelectorAll('.tab-panel').forEach((panel) => {
-          panel.hidden = panel.id !== `tab-${tab}`;
-        });
+      function openExternalWriter(options) {
+        writerWindow = window.open(WRITER_URL, 'umbrella-parade-writer-docs-preview');
+        if (!writerWindow) {
+          setStatus('自動で別画面を開けませんでした。「別画面で開く」を押してください。');
+          return false;
+        }
+
+        setStatus(options && options.userAction ? '別画面Writerを開きました' : '別画面Writerを開いています...');
+        if (snapshot) postSnapshotToWriter({ retry: true });
+        return true;
       }
 
-      function updateActiveButtons(selector, value) {
-        document.querySelectorAll(selector).forEach((button) => {
-          const key = button.dataset.target || button.dataset.direction;
-          button.classList.toggle('active', key === value);
-        });
+      function syncExternalWriter() {
+        if (!writerWindow || writerWindow.closed) {
+          if (!openExternalWriter({ userAction: true })) return;
+        }
+
+        setStatus('別画面へ同期しています...');
+        refreshSnapshot({ postAfterLoad: true });
       }
 
       function refreshSnapshot(options) {
-        const silent = Boolean(options && options.silent);
         if (isRefreshing) {
           pendingRefresh = true;
           return;
         }
 
         isRefreshing = true;
-        if (!silent) setStatus('Docs本文を読み込み中...');
         google.script.run
-          .withSuccessHandler((snapshot) => {
+          .withSuccessHandler((nextSnapshot) => {
             isRefreshing = false;
-            state.snapshot = snapshot;
+            snapshot = nextSnapshot;
+            renderStats();
             setStatus(`${snapshot.title} を読み込みました`);
-            renderAll();
-            postSnapshotToWriter({ retry: true });
+            if (options && options.postAfterLoad) postSnapshotToWriter({ retry: true });
             if (pendingRefresh) {
               pendingRefresh = false;
-              refreshSnapshot({ silent: true });
+              refreshSnapshot({ postAfterLoad: true });
             }
           })
           .withFailureHandler((error) => {
@@ -562,69 +188,24 @@
           .getDocumentSnapshot();
       }
 
-      function openExternalWriter() {
-        writerWindow = window.open(WRITER_URL, 'umbrella-parade-writer-docs-preview');
-        if (!writerWindow) {
-          setStatus('別画面を開けませんでした。ポップアップ許可を確認してください。');
-          return;
-        }
-
-        setStatus('別画面のWriterを開きました');
-        if (state.snapshot) {
-          postSnapshotToWriter({ retry: true });
-        } else {
-          refreshSnapshot();
-        }
-        startAutoRefresh();
-      }
-
-      function syncExternalWriter() {
-        if (!writerWindow || writerWindow.closed) {
-          setStatus('先に「別画面で開く」を押してください。');
-          return;
-        }
-
-        setStatus('別画面へ同期しています...');
-        refreshSnapshot();
-      }
-
-      function toggleAutoRefresh() {
-        if (autoRefreshTimer) {
-          stopAutoRefresh();
-        } else {
-          startAutoRefresh();
-        }
-      }
-
-      function startAutoRefresh() {
-        if (autoRefreshTimer) return;
-        autoRefreshTimer = window.setInterval(() => refreshSnapshot({ silent: true }), AUTO_REFRESH_MS);
-        updateAutoRefreshButton(true);
-      }
-
-      function stopAutoRefresh() {
-        if (!autoRefreshTimer) return;
-        window.clearInterval(autoRefreshTimer);
-        autoRefreshTimer = 0;
-        updateAutoRefreshButton(false);
-      }
-
-      function updateAutoRefreshButton(active) {
-        const button = document.getElementById('auto-refresh');
-        button.textContent = active ? '自動更新ON' : '自動更新OFF';
-        button.classList.toggle('auto-sync-active', active);
-        button.setAttribute('aria-pressed', String(active));
+      function renderStats() {
+        if (!snapshot) return;
+        document.getElementById('stat-chars').textContent = Number(snapshot.characterCount || 0).toLocaleString();
+        document.getElementById('stat-headings').textContent = Array.isArray(snapshot.toc)
+          ? snapshot.toc.length.toLocaleString()
+          : '0';
+        document.getElementById('stat-links').textContent = Array.isArray(snapshot.links)
+          ? snapshot.links.length.toLocaleString()
+          : '0';
       }
 
       function postSnapshotToWriter(options) {
-        if (!writerWindow || writerWindow.closed || !state.snapshot) return;
+        if (!writerWindow || writerWindow.closed || !snapshot) return;
 
         const payload = {
           source: 'umbrella-parade-docs-addon',
           type: 'docsSnapshot',
-          snapshot: state.snapshot,
-          target: state.target,
-          direction: state.direction,
+          snapshot,
         };
 
         writerWindow.postMessage(payload, WRITER_ORIGIN);
@@ -632,436 +213,6 @@
           window.setTimeout(() => writerWindow && !writerWindow.closed && writerWindow.postMessage(payload, WRITER_ORIGIN), 900);
           window.setTimeout(() => writerWindow && !writerWindow.closed && writerWindow.postMessage(payload, WRITER_ORIGIN), 1800);
         }
-      }
-
-      function readSelection() {
-        setStatus('選択文字を取得中...');
-        google.script.run
-          .withSuccessHandler((text) => {
-            document.getElementById('ruby-base').value = text || '';
-            setStatus(text ? '選択文字を取得しました' : '選択文字が見つかりませんでした');
-          })
-          .withFailureHandler((error) => setStatus(error.message || '取得に失敗しました'))
-          .getSelectedText();
-      }
-
-      function insertRuby() {
-        const base = document.getElementById('ruby-base').value.trim();
-        const ruby = document.getElementById('ruby-text').value.trim();
-        setStatus('ルビ記法を挿入中...');
-        google.script.run
-          .withSuccessHandler((result) => {
-            setStatus(result.message || 'ルビ記法を挿入しました');
-            refreshSnapshot();
-          })
-          .withFailureHandler((error) => setStatus(error.message || '挿入に失敗しました'))
-          .insertRubyMarkup({ base, ruby });
-      }
-
-      function insertLink() {
-        const label = document.getElementById('link-label').value.trim();
-        const url = document.getElementById('link-url').value.trim();
-        setStatus('リンクを挿入中...');
-        google.script.run
-          .withSuccessHandler((result) => {
-            setStatus(result.message || 'リンクを挿入しました');
-            refreshSnapshot();
-          })
-          .withFailureHandler((error) => setStatus(error.message || '挿入に失敗しました'))
-          .insertLinkedText({ label, url });
-      }
-
-      function renderAll() {
-        renderPreview();
-        renderCheck();
-      }
-
-      function renderPreview() {
-        const container = document.getElementById('preview');
-        const snapshot = state.snapshot;
-        if (!snapshot) {
-          container.innerHTML = '<p class="muted">サイドバー更新を押してください。</p>';
-          return;
-        }
-
-        const pages = paginate(snapshot.blocks, state.target, state.direction);
-        container.className = `page-list ${state.direction}`;
-        container.innerHTML = pages
-          .map((page, index) => {
-            const body = page.map(renderBlock).join('');
-            return `<section class="page ${state.target} ${state.direction}">${body}<span class="page-number">${index + 1}</span></section>`;
-          })
-          .join('');
-        bindHeadingLinks(container);
-      }
-
-      function renderBlock(block) {
-        if (block.type === 'pageBreak') return '';
-        if (block.type === 'toc') return renderDocToc(block);
-        const text = formatInlineSegments(block.segments || [{ text: block.text || '', url: '' }]);
-        if (block.headingLevel === 1) return `<h1 id="${block.id}">${text}</h1>`;
-        if (block.headingLevel === 2) return `<h2 id="${block.id}">${text}</h2>`;
-        if (block.headingLevel === 3) return `<h3 id="${block.id}">${text}</h3>`;
-        if (!text.trim()) return '<p><br></p>';
-        return `<p>${text}</p>`;
-      }
-
-      function renderDocToc(block) {
-        const items = Array.isArray(block.items) ? block.items : [];
-        const links = items.length
-          ? items
-              .map((item) => `<a class="level-${item.level}" data-heading="${item.id}">${escapeHtml(item.title)}</a>`)
-              .join('')
-          : '<p class="muted">見出しがまだ見つかりません。</p>';
-        return `<nav class="doc-toc"><h2>目次</h2>${links}</nav>`;
-      }
-
-      function renderCheck() {
-        const snapshot = state.snapshot;
-        if (!snapshot) return;
-
-        document.getElementById('stat-chars').textContent = snapshot.characterCount.toLocaleString();
-        document.getElementById('stat-headings').textContent = snapshot.toc.length.toLocaleString();
-        document.getElementById('stat-links').textContent = snapshot.links.length.toLocaleString();
-
-        document.getElementById('toc').innerHTML = snapshot.toc.length
-          ? snapshot.toc
-              .map((item) => `<a class="level-${item.level}" data-heading="${item.id}">${escapeHtml(item.title)}</a>`)
-              .join('')
-          : '<p class="muted">見出しがありません。各章タイトルは見出し1にしてください。</p>';
-
-        bindHeadingLinks(document.getElementById('toc'));
-
-        document.getElementById('links').innerHTML = snapshot.links.length
-          ? snapshot.links
-              .map((link) => `<a href="${escapeAttribute(link.url)}" target="_blank">${escapeHtml(link.label || link.url)}</a>`)
-              .join('')
-          : '<p class="muted">リンクは見つかりませんでした。</p>';
-      }
-
-      function paginate(blocks, target, direction) {
-        const capacity = direction === 'vertical'
-          ? target === 'shimauma' ? 28 : 24
-          : target === 'shimauma' ? 38 : 42;
-        const queue = [];
-        const pages = [];
-        let current = [];
-        let units = 0;
-
-        blocks.forEach((block) => {
-          queue.push(...splitPreviewBlock(block, target, direction, capacity));
-        });
-
-        queue.forEach((block) => {
-          if (block.type === 'pageBreak') {
-            flush();
-            return;
-          }
-
-          const blockUnits = Math.min(capacity, estimateUnits(block, target, direction));
-          if (current.length && units + blockUnits > capacity) flush();
-          current.push(block);
-          units += blockUnits;
-        });
-
-        flush();
-        return pages.length ? pages : [[]];
-
-        function flush() {
-          if (!current.length) return;
-          pages.push(current);
-          current = [];
-          units = 0;
-        }
-      }
-
-      function splitPreviewBlock(block, target, direction, capacity) {
-        if (block.type === 'pageBreak' || block.type === 'toc' || block.headingLevel) return [block];
-
-        const segments = Array.isArray(block.segments) && block.segments.length
-          ? block.segments
-          : [{ text: block.text || '', url: '' }];
-        const textLength = segments.map((segment) => segment.text || '').join('').replace(/\s/g, '').length;
-        const maxChars = Math.max(24, Math.floor(getCharsPerLine(target, direction) * Math.max(4, capacity - 2)));
-
-        if (textLength <= maxChars) return [block];
-
-        return splitSegments(segments, maxChars).map((chunk) => ({
-          ...block,
-          id: '',
-          headingLevel: 0,
-          text: chunk.map((segment) => segment.text || '').join(''),
-          segments: chunk,
-        }));
-      }
-
-      function splitSegments(segments, maxChars) {
-        const chunks = [];
-        let current = [];
-        let currentLength = 0;
-
-        const pushCurrent = () => {
-          if (!current.length) return;
-          chunks.push(current);
-          current = [];
-          currentLength = 0;
-        };
-
-        segments.forEach((segment) => {
-          const text = String(segment.text || '');
-          const url = segment.url || '';
-          let cursor = 0;
-
-          while (cursor < text.length) {
-            const remaining = Math.max(1, maxChars - currentLength);
-            const slice = text.slice(cursor, cursor + remaining);
-            current.push({ text: slice, url });
-            currentLength += slice.replace(/\s/g, '').length;
-            cursor += slice.length;
-
-            if (currentLength >= maxChars) pushCurrent();
-          }
-        });
-
-        pushCurrent();
-        return chunks.length ? chunks : [segments];
-      }
-
-      function estimateUnits(block, target, direction) {
-        if (block.type === 'toc') {
-          const items = Array.isArray(block.items) ? block.items.length : 0;
-          return Math.max(4, items + 3);
-        }
-
-        const textLength = (block.text || '').replace(/\s/g, '').length;
-        const chars = getCharsPerLine(target, direction);
-        const lines = Math.max(1, Math.ceil(textLength / chars));
-        if (block.headingLevel === 1) return lines + 4;
-        if (block.headingLevel === 2) return lines + 2;
-        return lines + 1;
-      }
-
-      function getCharsPerLine(target, direction) {
-        if (direction === 'vertical') return target === 'shimauma' ? 31 : 28;
-        return target === 'shimauma' ? 26 : 30;
-      }
-
-      function bindHeadingLinks(root) {
-        root.querySelectorAll('[data-heading]').forEach((link) => {
-          link.addEventListener('click', (event) => {
-            event.preventDefault();
-            setTab('preview');
-            const heading = document.getElementById(link.dataset.heading);
-            if (heading) heading.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-          });
-        });
-      }
-
-      function formatInlineSegments(segments) {
-        return segments
-          .map((segment) => {
-            const text = formatInlineText(segment.text || '');
-            if (!segment.url) return text;
-            return `<a href="${escapeAttribute(segment.url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
-          })
-          .join('');
-      }
-
-      function formatInlineText(value) {
-        return escapeHtml(value)
-          .replace(/｜([^《\n]+)《([^》\n]+)》/g, '<ruby>$1<rp>（</rp><rt>$2</rt><rp>）</rp></ruby>')
-          .replace(/\n/g, '<br>');
-      }
-
-      function renderAplus() {
-        const editors = document.getElementById('aplus-editors');
-        editors.innerHTML = state.aplus
-          .map((item, index) => `
-            <div class="aplus-item" data-aplus-index="${index}">
-              <h2>A+ 画像 ${index + 1}</h2>
-              <label>画像<input type="file" accept="image/*" data-aplus-field="image"></label>
-              <label>代替テキスト <span class="count">${item.altText.length}/100</span><input maxlength="100" value="${escapeAttribute(item.altText)}" data-aplus-field="altText"></label>
-              <label>画像キャプション <span class="count">${item.caption.length}/200</span><input maxlength="200" value="${escapeAttribute(item.caption)}" data-aplus-field="caption"></label>
-              <label>見出し <span class="count">${item.heading.length}/160</span><input maxlength="160" value="${escapeAttribute(item.heading)}" data-aplus-field="heading"></label>
-              <label>説明 <span class="count">${item.description.length}/1000</span><textarea maxlength="1000" data-aplus-field="description">${escapeHtml(item.description)}</textarea></label>
-            </div>
-          `)
-          .join('');
-
-        editors.querySelectorAll('[data-aplus-field]').forEach((input) => {
-          input.addEventListener('input', handleAplusInput);
-          input.addEventListener('change', handleAplusInput);
-        });
-
-        renderAplusPreview();
-      }
-
-      function renderAplusPreview() {
-        const preview = document.getElementById('aplus-preview');
-        preview.innerHTML = state.aplus
-          .map((item, index) => `
-            <article class="aplus-card">
-              ${item.imageSrc ? `<img src="${item.imageSrc}" alt="">` : `<div class="image-placeholder">A+ ${index + 1}</div>`}
-              ${item.caption ? `<p>${escapeHtml(item.caption)}</p>` : ''}
-              <h3>${escapeHtml(item.heading || `A+ 画像 ${index + 1}`)}</h3>
-              ${item.description ? `<p>${escapeHtml(item.description)}</p>` : ''}
-            </article>
-          `)
-          .join('');
-      }
-
-      function handleAplusInput(event) {
-        const input = event.currentTarget;
-        const editor = input.closest('[data-aplus-index]');
-        const index = Number(editor.dataset.aplusIndex);
-        const field = input.dataset.aplusField;
-
-        if (field === 'image') {
-          const file = input.files && input.files[0];
-          if (!file) return;
-          const reader = new FileReader();
-          reader.onload = async () => {
-            state.aplus[index].imageSrc = await compactImage(String(reader.result || ''), 1000);
-            state.aplus[index].imageName = file.name;
-            saveAplus();
-            renderAplus();
-          };
-          reader.readAsDataURL(file);
-          return;
-        }
-
-        state.aplus[index][field] = input.value;
-        const count = input.closest('label').querySelector('.count');
-        if (count) count.textContent = `${input.value.length}/${input.maxLength}`;
-        saveAplus();
-        renderAplusPreview();
-      }
-
-      async function compactImage(dataUrl, maxSide) {
-        if (!dataUrl.startsWith('data:image/')) return dataUrl;
-        const image = await loadImage(dataUrl);
-        const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
-        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
-        const context = canvas.getContext('2d');
-        context.fillStyle = '#fff';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg', 0.86);
-      }
-
-      function downloadAplus() {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1400;
-        canvas.height = 1500;
-        const context = canvas.getContext('2d');
-        context.fillStyle = '#fff';
-        context.fillRect(0, 0, canvas.width, canvas.height);
-        Promise.all(state.aplus.map((item) => item.imageSrc ? loadImage(item.imageSrc) : null)).then((images) => {
-          state.aplus.forEach((item, index) => {
-            const col = index % 2;
-            const row = Math.floor(index / 2);
-            const x = 60 + col * 670;
-            const y = 60 + row * 700;
-            context.strokeStyle = '#d0c4b2';
-            context.strokeRect(x, y, 600, 640);
-            context.fillStyle = '#f0e7da';
-            context.fillRect(x + 30, y + 30, 300, 300);
-            if (images[index]) drawCoverImage(context, images[index], x + 30, y + 30, 300, 300);
-            context.fillStyle = '#111';
-            context.font = 'bold 28px sans-serif';
-            wrapText(context, item.heading || `A+ 画像 ${index + 1}`, x + 360, y + 52, 220, 34, 3);
-            context.font = '20px sans-serif';
-            wrapText(context, item.caption, x + 30, y + 370, 540, 28, 3);
-            context.font = '22px sans-serif';
-            wrapText(context, item.description, x + 30, y + 470, 540, 30, 5);
-          });
-          downloadCanvas(canvas, 'umbrella-parade-a-plus.png');
-        });
-      }
-
-      function drawCoverImage(context, image, x, y, width, height) {
-        const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
-        const sw = width / scale;
-        const sh = height / scale;
-        const sx = (image.naturalWidth - sw) / 2;
-        const sy = (image.naturalHeight - sh) / 2;
-        context.drawImage(image, sx, sy, sw, sh, x, y, width, height);
-      }
-
-      function wrapText(context, text, x, y, maxWidth, lineHeight, maxLines) {
-        const chars = String(text || '').split('');
-        let line = '';
-        let lines = 0;
-        chars.forEach((char) => {
-          const next = line + char;
-          if (context.measureText(next).width > maxWidth && line) {
-            if (lines < maxLines) context.fillText(line, x, y + lines * lineHeight);
-            line = char;
-            lines += 1;
-          } else {
-            line = next;
-          }
-        });
-        if (line && lines < maxLines) context.fillText(line, x, y + lines * lineHeight);
-      }
-
-      function downloadCanvas(canvas, filename) {
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
-        link.download = filename;
-        link.click();
-      }
-
-      function loadImage(src) {
-        return new Promise((resolve, reject) => {
-          const image = new Image();
-          image.onload = () => resolve(image);
-          image.onerror = reject;
-          image.src = src;
-        });
-      }
-
-      function createDefaultAplus() {
-        return [1, 2, 3, 4].map((number) => ({
-          imageSrc: '',
-          imageName: '',
-          altText: '',
-          caption: '',
-          heading: number === 1 ? '物語の世界観' : '',
-          description: '',
-        }));
-      }
-
-      function loadAplus() {
-        try {
-          const saved = JSON.parse(localStorage.getItem('umbrella-parade-docs-aplus') || 'null');
-          return Array.isArray(saved) && saved.length === 4 ? saved : createDefaultAplus();
-        } catch {
-          return createDefaultAplus();
-        }
-      }
-
-      function saveAplus() {
-        try {
-          localStorage.setItem('umbrella-parade-docs-aplus', JSON.stringify(state.aplus));
-        } catch {
-          setStatus('A+画像が大きすぎて保存できません。画像を小さくしてください。');
-        }
-      }
-
-      function escapeHtml(value) {
-        return String(value || '')
-          .replaceAll('&', '&amp;')
-          .replaceAll('<', '&lt;')
-          .replaceAll('>', '&gt;')
-          .replaceAll('"', '&quot;')
-          .replaceAll("'", '&#039;');
-      }
-
-      function escapeAttribute(value) {
-        return escapeHtml(value).replaceAll('`', '&#096;');
       }
     </script>
   </body>
