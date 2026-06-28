@@ -682,7 +682,7 @@ select:focus {
 .preview-sheet {
   flex: 0 0 auto;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
   border: 1px solid #cdbfaa;
   border-radius: 4px;
   background: #fffefa;

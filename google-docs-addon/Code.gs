@@ -4,7 +4,6 @@ function onOpen() {
   DocumentApp.getUi()
     .createMenu('Umbrella Parade')
     .addItem('サイドバーを開く', 'showSidebar')
-    .addItem('大きい表示で開く', 'showWidePreview')
     .addSeparator()
     .addItem('選択文字にルビ記法を入れる', 'showRubyPrompt')
     .addToUi();
@@ -18,14 +17,6 @@ function showSidebar() {
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
     .setTitle(ADDON_NAME);
   DocumentApp.getUi().showSidebar(html);
-}
-
-function showWidePreview() {
-  const html = HtmlService.createHtmlOutputFromFile('Sidebar')
-    .setTitle(`${ADDON_NAME} 大きい表示`)
-    .setWidth(980)
-    .setHeight(760);
-  DocumentApp.getUi().showModelessDialog(html, `${ADDON_NAME} 大きい表示`);
 }
 
 function showRubyPrompt() {

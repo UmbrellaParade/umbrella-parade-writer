@@ -1737,13 +1737,46 @@ function createPreviewInlineTokens(nodes: Node[], maxChars: number): { html: str
     if (node.nodeType !== Node.ELEMENT_NODE) return [];
 
     const element = node as Element;
-    if (element.tagName.toLowerCase() === "br") {
-      return [{ html: "<br />", length: 1 }];
-    }
-
-    const html = element.outerHTML;
-    return [{ html, length: Math.max(1, getVisibleTextLength(html)) }];
+    return splitPreviewInlineElement(element, maxChars);
   });
+}
+
+function splitPreviewInlineElement(element: Element, maxChars: number): { html: string; length: number }[] {
+  const tagName = element.tagName.toLowerCase();
+  if (tagName === "br") return [{ html: "<br />", length: 1 }];
+
+  const html = element.outerHTML;
+  const length = Math.max(1, getVisibleTextLength(html));
+  if (length <= maxChars) return [{ html, length }];
+
+  if (tagName === "a") {
+    const href = element.getAttribute("href") || "";
+    const target = element.getAttribute("target") || "";
+    const rel = element.getAttribute("rel") || "";
+    const attrs = [
+      href ? `href="${escapeHtml(href)}"` : "",
+      target ? `target="${escapeHtml(target)}"` : "",
+      rel ? `rel="${escapeHtml(rel)}"` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return splitPreviewText(element.textContent || "", maxChars).map((text) => ({
+      html: `<a ${attrs}>${escapeHtml(text)}</a>`,
+      length: text.replace(/\s/g, "").length,
+    }));
+  }
+
+  if (tagName === "span") {
+    const className = element.getAttribute("class") || "";
+    const attrs = className ? ` class="${escapeHtml(className)}"` : "";
+    return splitPreviewText(element.textContent || "", maxChars).map((text) => ({
+      html: `<span${attrs}>${escapeHtml(text)}</span>`,
+      length: text.replace(/\s/g, "").length,
+    }));
+  }
+
+  return createPreviewInlineTokens(Array.from(element.childNodes), maxChars);
 }
 
 function splitPreviewText(text: string, maxChars: number) {

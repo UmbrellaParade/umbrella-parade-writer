@@ -185,7 +185,7 @@
       .page {
         position: relative;
         flex: 0 0 auto;
-        overflow: hidden;
+        overflow: auto;
         width: 230px;
         min-height: 360px;
         border: 1px solid #bfae98;
@@ -361,8 +361,7 @@
     <section id="tab-preview" class="tab-panel">
       <div class="section preview-toolbar">
         <div class="actions">
-          <button class="primary" id="refresh">Docsから更新</button>
-          <button id="open-wide">大きく開く</button>
+          <button class="primary" id="refresh">サイドバー更新</button>
           <button id="open-external">別画面で開く</button>
           <button id="sync-external">別画面へ同期</button>
           <button id="auto-refresh" aria-pressed="false">自動更新OFF</button>
@@ -498,7 +497,6 @@
       });
 
       document.getElementById('refresh').addEventListener('click', refreshSnapshot);
-      document.getElementById('open-wide').addEventListener('click', openWidePreview);
       document.getElementById('open-external').addEventListener('click', openExternalWriter);
       document.getElementById('sync-external').addEventListener('click', syncExternalWriter);
       document.getElementById('auto-refresh').addEventListener('click', toggleAutoRefresh);
@@ -562,14 +560,6 @@
             setStatus(error.message || '読み込みに失敗しました');
           })
           .getDocumentSnapshot();
-      }
-
-      function openWidePreview() {
-        setStatus('大きい表示を開いています...');
-        google.script.run
-          .withSuccessHandler(() => setStatus('大きい表示を開きました'))
-          .withFailureHandler((error) => setStatus(error.message || '大きい表示を開けませんでした'))
-          .showWidePreview();
       }
 
       function openExternalWriter() {
@@ -690,7 +680,7 @@
         const container = document.getElementById('preview');
         const snapshot = state.snapshot;
         if (!snapshot) {
-          container.innerHTML = '<p class="muted">Docsから更新してください。</p>';
+          container.innerHTML = '<p class="muted">サイドバー更新を押してください。</p>';
           return;
         }
 
@@ -753,17 +743,22 @@
         const capacity = direction === 'vertical'
           ? target === 'shimauma' ? 28 : 24
           : target === 'shimauma' ? 38 : 42;
+        const queue = [];
         const pages = [];
         let current = [];
         let units = 0;
 
         blocks.forEach((block) => {
+          queue.push(...splitPreviewBlock(block, target, direction, capacity));
+        });
+
+        queue.forEach((block) => {
           if (block.type === 'pageBreak') {
             flush();
             return;
           }
 
-          const blockUnits = estimateUnits(block, target, direction);
+          const blockUnits = Math.min(capacity, estimateUnits(block, target, direction));
           if (current.length && units + blockUnits > capacity) flush();
           current.push(block);
           units += blockUnits;
@@ -780,6 +775,58 @@
         }
       }
 
+      function splitPreviewBlock(block, target, direction, capacity) {
+        if (block.type === 'pageBreak' || block.type === 'toc' || block.headingLevel) return [block];
+
+        const segments = Array.isArray(block.segments) && block.segments.length
+          ? block.segments
+          : [{ text: block.text || '', url: '' }];
+        const textLength = segments.map((segment) => segment.text || '').join('').replace(/\s/g, '').length;
+        const maxChars = Math.max(24, Math.floor(getCharsPerLine(target, direction) * Math.max(4, capacity - 2)));
+
+        if (textLength <= maxChars) return [block];
+
+        return splitSegments(segments, maxChars).map((chunk) => ({
+          ...block,
+          id: '',
+          headingLevel: 0,
+          text: chunk.map((segment) => segment.text || '').join(''),
+          segments: chunk,
+        }));
+      }
+
+      function splitSegments(segments, maxChars) {
+        const chunks = [];
+        let current = [];
+        let currentLength = 0;
+
+        const pushCurrent = () => {
+          if (!current.length) return;
+          chunks.push(current);
+          current = [];
+          currentLength = 0;
+        };
+
+        segments.forEach((segment) => {
+          const text = String(segment.text || '');
+          const url = segment.url || '';
+          let cursor = 0;
+
+          while (cursor < text.length) {
+            const remaining = Math.max(1, maxChars - currentLength);
+            const slice = text.slice(cursor, cursor + remaining);
+            current.push({ text: slice, url });
+            currentLength += slice.replace(/\s/g, '').length;
+            cursor += slice.length;
+
+            if (currentLength >= maxChars) pushCurrent();
+          }
+        });
+
+        pushCurrent();
+        return chunks.length ? chunks : [segments];
+      }
+
       function estimateUnits(block, target, direction) {
         if (block.type === 'toc') {
           const items = Array.isArray(block.items) ? block.items.length : 0;
@@ -787,13 +834,16 @@
         }
 
         const textLength = (block.text || '').replace(/\s/g, '').length;
-        const chars = direction === 'vertical'
-          ? target === 'shimauma' ? 31 : 28
-          : target === 'shimauma' ? 26 : 30;
+        const chars = getCharsPerLine(target, direction);
         const lines = Math.max(1, Math.ceil(textLength / chars));
         if (block.headingLevel === 1) return lines + 4;
         if (block.headingLevel === 2) return lines + 2;
         return lines + 1;
+      }
+
+      function getCharsPerLine(target, direction) {
+        if (direction === 'vertical') return target === 'shimauma' ? 31 : 28;
+        return target === 'shimauma' ? 26 : 30;
       }
 
       function bindHeadingLinks(root) {
