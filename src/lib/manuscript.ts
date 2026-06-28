@@ -2,6 +2,7 @@ import type { ImageAsset, ManuscriptImage, RenderedManuscript, TocItem } from ".
 
 const headingOne = /^#\s+(.+)$/;
 const headingTwo = /^##\s+(.+)$/;
+const inlineTocMarker = /^\[\[TOC\]\]$/i;
 const imageLine = /^!\[([^\]]*)\]\((asset:[A-Za-z0-9_-]+|data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
 
 export const sampleManuscript = `# 第一章　傘の下の約束
@@ -21,13 +22,14 @@ export const sampleManuscript = `# 第一章　傘の下の約束
 招待状には、細い青の下線でリンクが引かれていた。`;
 
 export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = []): RenderedManuscript {
-  const toc: TocItem[] = [];
   const images: ManuscriptImage[] = [];
   const htmlBlocks: string[] = [];
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
+  const toc = createToc(lines);
 
   let paragraph: string[] = [];
   let wordCount = 0;
+  let headingIndex = 0;
 
   const flushParagraph = () => {
     if (!paragraph.length) return;
@@ -44,21 +46,25 @@ export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = [
     const h2 = line.match(headingTwo);
     const image = parseMarkdownImageLine(line, images.length + 1, imageAssets);
 
+    if (inlineTocMarker.test(line.trim())) {
+      flushParagraph();
+      htmlBlocks.push(createInlineToc(toc));
+      return;
+    }
+
     if (h1) {
       flushParagraph();
       const title = h1[1].trim();
-      const id = toAnchorId(title, toc.length + 1);
-      toc.push({ id, title, level: 1 });
-      htmlBlocks.push(`<h1 id="${id}" class="chapter-heading">${formatInline(title)}</h1>`);
+      const item = toc[headingIndex++] || { id: toAnchorId(title, headingIndex), title, level: 1 };
+      htmlBlocks.push(`<h1 id="${item.id}" class="chapter-heading">${formatInline(title)}</h1>`);
       return;
     }
 
     if (h2) {
       flushParagraph();
       const title = h2[1].trim();
-      const id = toAnchorId(title, toc.length + 1);
-      toc.push({ id, title, level: 2 });
-      htmlBlocks.push(`<h2 id="${id}" class="section-heading">${formatInline(title)}</h2>`);
+      const item = toc[headingIndex++] || { id: toAnchorId(title, headingIndex), title, level: 2 };
+      htmlBlocks.push(`<h2 id="${item.id}" class="section-heading">${formatInline(title)}</h2>`);
       return;
     }
 
@@ -109,6 +115,41 @@ export function createKindleNav(toc: TocItem[]) {
     .filter((item) => item.level === 1)
     .map((item) => `<li><a href="content.xhtml#${item.id}">${escapeHtml(item.title)}</a></li>`)
     .join("");
+}
+
+function createToc(lines: string[]): TocItem[] {
+  const toc: TocItem[] = [];
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trimEnd();
+    const h1 = line.match(headingOne);
+    const h2 = line.match(headingTwo);
+
+    if (h1) {
+      const title = h1[1].trim();
+      toc.push({ id: toAnchorId(title, toc.length + 1), title, level: 1 });
+    }
+
+    if (h2) {
+      const title = h2[1].trim();
+      toc.push({ id: toAnchorId(title, toc.length + 1), title, level: 2 });
+    }
+  });
+
+  return toc;
+}
+
+function createInlineToc(toc: TocItem[]) {
+  const entries = toc
+    .map(
+      (item) =>
+        `<li class="toc-level-${item.level}"><a href="#${item.id}">${escapeHtml(item.title)}</a></li>`,
+    )
+    .join("");
+
+  return `<nav class="manuscript-toc" aria-label="目次"><h2>目次</h2>${
+    entries ? `<ol>${entries}</ol>` : "<p>見出し1を追加すると目次が作られます。</p>"
+  }</nav>`;
 }
 
 export function stripMarkupForDocx(text: string): string {

@@ -4,6 +4,8 @@ export type PreviewTarget = "standard" | "kindle" | "shimauma";
 
 export type WorkspaceTab = "write" | "qr" | "settings";
 
+export type WriterFontFamily = "noto-sans-jp" | "shippori-mincho";
+
 export type AiProviderKey = "openai" | "anthropic" | "gemini";
 
 export interface AiProviderConfig {
@@ -11,6 +13,11 @@ export interface AiProviderConfig {
   label: string;
   apiKey: string;
   selectedModel: string;
+}
+
+export interface TypographySettings {
+  fontFamily: WriterFontFamily;
+  fontSize: number;
 }
 
 export interface TocItem {

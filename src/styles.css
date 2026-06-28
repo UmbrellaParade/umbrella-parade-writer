@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Shippori+Mincho:wght@400;500;600;700&display=swap");
+
 :root {
   color: #1b1a17;
   background: #f4f1eb;
@@ -248,6 +250,8 @@ select:focus {
 }
 
 .writer-grid {
+  --writer-font-family: "Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+  --writer-font-size: 16px;
   min-height: calc(100vh - 110px);
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1fr);
@@ -268,6 +272,28 @@ select:focus {
   padding-right: 4px;
 }
 
+.typography-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.typography-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6f5d45;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.typography-controls select {
+  width: auto;
+  min-width: 112px;
+  min-height: 38px;
+}
+
 .editor-pane,
 .preview-page {
   min-height: 0;
@@ -278,23 +304,67 @@ select:focus {
   overflow: auto;
 }
 
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+}
+
 .editor-pane textarea {
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
   resize: none;
   border: 0;
   border-radius: 8px;
   padding: 28px;
   line-height: 1.9;
-  font-family:
-    "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
-  font-size: 1.03rem;
+  font-family: var(--writer-font-family);
+  font-size: var(--writer-font-size);
   background: transparent;
+}
+
+.editor-image-strip {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-top: 1px solid #e2d8ca;
+  background: #fbf7ef;
+}
+
+.editor-image-card {
+  flex: 0 0 96px;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+
+.editor-image-card img {
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+  border: 1px solid #d3c6b6;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.editor-image-card figcaption {
+  width: 100%;
+  color: #6b5b48;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .preview-page {
   padding: 44px;
-  font-family:
-    "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif;
+  font-family: var(--writer-font-family);
+  font-size: var(--writer-font-size);
   line-height: 2;
   color: #151311;
   scroll-behavior: smooth;
@@ -364,6 +434,35 @@ select:focus {
   color: #6b5b48;
 }
 
+.preview-page .manuscript-toc {
+  margin: 0 0 2em;
+  padding: 0;
+  writing-mode: inherit;
+}
+
+.preview-page .manuscript-toc h2 {
+  margin-bottom: 0.8em;
+}
+
+.preview-page .manuscript-toc ol {
+  margin: 0;
+  padding-inline-start: 1.5em;
+}
+
+.preview-page .manuscript-toc li {
+  margin-bottom: 0.35em;
+}
+
+.preview-page .manuscript-toc .toc-level-2 {
+  margin-inline-start: 1em;
+}
+
+.preview-page .manuscript-toc a {
+  color: #0b61d8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .preview-page.vertical {
   writing-mode: vertical-rl;
   text-orientation: mixed;
@@ -371,7 +470,7 @@ select:focus {
 }
 
 .preview-page.kindle {
-  max-width: 760px;
+  max-width: 620px;
   margin-inline: auto;
   box-shadow: inset 0 0 0 10px #f8f5ef;
 }

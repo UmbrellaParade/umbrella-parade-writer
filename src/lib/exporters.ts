@@ -3,7 +3,7 @@ import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
-import type { RenderedManuscript, TocItem } from "../types";
+import type { RenderedManuscript, TocItem, TypographySettings } from "../types";
 import {
   createKindleNav,
   dataUrlToBytes,
@@ -12,8 +12,18 @@ import {
   stripMarkupForDocx,
 } from "./manuscript";
 
-export async function exportDocx(markdown: string, title: string, rendered: RenderedManuscript) {
-  const children = await createDocxChildren(markdown, rendered);
+const fallbackTypography: TypographySettings = {
+  fontFamily: "shippori-mincho",
+  fontSize: 16,
+};
+
+export async function exportDocx(
+  markdown: string,
+  title: string,
+  rendered: RenderedManuscript,
+  typography: TypographySettings = fallbackTypography,
+) {
+  const children = await createDocxChildren(markdown, rendered, typography);
 
   const doc = new Document({
     sections: [
@@ -44,7 +54,11 @@ export async function exportPdf(previewElement: HTMLElement, title: string) {
   pdf.save(`${safeFilename(title)}.pdf`);
 }
 
-export async function exportEpub(rendered: RenderedManuscript, title: string) {
+export async function exportEpub(
+  rendered: RenderedManuscript,
+  title: string,
+  typography: TypographySettings = fallbackTypography,
+) {
   const zip = new JSZip();
   let contentHtml = rendered.html;
 
@@ -65,7 +79,7 @@ export async function exportEpub(rendered: RenderedManuscript, title: string) {
 </container>`,
   );
 
-  zip.file("OEBPS/content.xhtml", wrapXhtml(title, contentHtml));
+  zip.file("OEBPS/content.xhtml", wrapXhtml(title, contentHtml, typography));
   zip.file("OEBPS/nav.xhtml", createNavXhtml(title, rendered.toc));
   zip.file("OEBPS/content.opf", createOpf(title, rendered));
 
@@ -77,7 +91,7 @@ export async function exportEpub(rendered: RenderedManuscript, title: string) {
   saveAs(blob, `${safeFilename(title)}.epub`);
 }
 
-function wrapXhtml(title: string, body: string) {
+function wrapXhtml(title: string, body: string, typography: TypographySettings) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja" lang="ja">
@@ -85,9 +99,12 @@ function wrapXhtml(title: string, body: string) {
     <title>${escapeHtml(title)}</title>
     <meta charset="UTF-8" />
     <style>
-      body { font-family: serif; line-height: 1.8; }
+      body { font-family: ${epubFontFamily(typography)}; font-size: ${typography.fontSize}px; line-height: 1.8; }
       a { color: #0b61d8; text-decoration: underline; }
       h1 { break-before: page; page-break-before: always; font-size: 1.5em; }
+      .manuscript-toc { margin: 1.5em 0 2em; }
+      .manuscript-toc ol { padding-inline-start: 1.5em; }
+      .manuscript-toc .toc-level-2 { margin-inline-start: 1em; }
       figure { margin: 1.5em 0; text-align: center; }
       figure img { max-width: 100%; height: auto; }
       figcaption { font-size: 0.85em; color: #555; }
@@ -117,7 +134,11 @@ function createNavXhtml(title: string, toc: TocItem[]) {
 </html>`;
 }
 
-async function createDocxChildren(markdown: string, rendered: RenderedManuscript) {
+async function createDocxChildren(
+  markdown: string,
+  rendered: RenderedManuscript,
+  typography: TypographySettings,
+) {
   const children: Paragraph[] = [];
   let seenHeadingOne = false;
 
@@ -156,13 +177,33 @@ async function createDocxChildren(markdown: string, rendered: RenderedManuscript
       continue;
     }
 
+    if (/^\[\[TOC\]\]$/i.test(line.trim())) {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 360, after: 180 },
+          children: [createTextRun("目次", typography, 2)],
+        }),
+      );
+      rendered.toc.forEach((item) => {
+        children.push(
+          new Paragraph({
+            indent: { left: item.level === 2 ? 360 : 0 },
+            spacing: { after: 80 },
+            children: [createTextRun(item.title, typography)],
+          }),
+        );
+      });
+      continue;
+    }
+
     if (line.startsWith("# ")) {
       children.push(
         new Paragraph({
           heading: HeadingLevel.HEADING_1,
           pageBreakBefore: seenHeadingOne,
           spacing: { before: seenHeadingOne ? 0 : 480, after: 240 },
-          children: [new TextRun(stripMarkupForDocx(line.replace(/^#\s+/, "")))],
+          children: [createTextRun(stripMarkupForDocx(line.replace(/^#\s+/, "")), typography, 6)],
         }),
       );
       seenHeadingOne = true;
@@ -174,7 +215,7 @@ async function createDocxChildren(markdown: string, rendered: RenderedManuscript
         new Paragraph({
           heading: HeadingLevel.HEADING_2,
           spacing: { before: 360, after: 180 },
-          children: [new TextRun(stripMarkupForDocx(line.replace(/^##\s+/, "")))],
+          children: [createTextRun(stripMarkupForDocx(line.replace(/^##\s+/, "")), typography, 3)],
         }),
       );
       continue;
@@ -183,12 +224,32 @@ async function createDocxChildren(markdown: string, rendered: RenderedManuscript
     children.push(
       new Paragraph({
         spacing: { line: 360, after: 160 },
-        children: [new TextRun(stripMarkupForDocx(line))],
+        children: [createTextRun(stripMarkupForDocx(line), typography)],
       }),
     );
   }
 
   return children;
+}
+
+function createTextRun(text: string, typography: TypographySettings, sizeOffset = 0) {
+  return new TextRun({
+    text,
+    font: docxFontName(typography),
+    size: Math.round((typography.fontSize + sizeOffset) * 2),
+  });
+}
+
+function docxFontName(typography: TypographySettings) {
+  return typography.fontFamily === "noto-sans-jp" ? "Noto Sans JP" : "Shippori Mincho";
+}
+
+function epubFontFamily(typography: TypographySettings) {
+  if (typography.fontFamily === "noto-sans-jp") {
+    return '"Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif';
+  }
+
+  return '"Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", serif';
 }
 
 function getDataImageSize(src: string) {

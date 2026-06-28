@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { CSSProperties, ChangeEvent, MouseEvent } from "react";
 import html2canvas from "html2canvas";
 import { saveAs } from "file-saver";
 import {
@@ -9,6 +9,7 @@ import {
   Heading1,
   ImageIcon,
   Link,
+  ListTree,
   QrCode,
   Redo2,
   Settings,
@@ -22,13 +23,21 @@ import QRCode from "qrcode";
 import { AI_PROVIDERS, getDefaultAiSettings } from "./data/aiModels";
 import { exportDocx, exportEpub, exportPdf } from "./lib/exporters";
 import { renderManuscript, sampleManuscript } from "./lib/manuscript";
-import type { AiProviderConfig, ImageAsset, PreviewTarget, WorkspaceTab, WritingDirection } from "./types";
+import type {
+  AiProviderConfig,
+  ImageAsset,
+  PreviewTarget,
+  TypographySettings,
+  WorkspaceTab,
+  WritingDirection,
+} from "./types";
 
 const storageKeys = {
   manuscript: "umbrella-parade-writer:manuscript",
   title: "umbrella-parade-writer:title",
   aiSettings: "umbrella-parade-writer:ai-settings",
   imageAssets: "umbrella-parade-writer:image-assets",
+  typography: "umbrella-parade-writer:typography",
 };
 
 const previewLabels: Record<PreviewTarget, string> = {
@@ -36,6 +45,18 @@ const previewLabels: Record<PreviewTarget, string> = {
   kindle: "Kindle",
   shimauma: "しまうま",
 };
+
+const defaultTypography: TypographySettings = {
+  fontFamily: "shippori-mincho",
+  fontSize: 16,
+};
+
+const fontOptions: { value: TypographySettings["fontFamily"]; label: string }[] = [
+  { value: "shippori-mincho", label: "Shippori Mincho" },
+  { value: "noto-sans-jp", label: "Noto Sans JP" },
+];
+
+const fontSizeOptions = [14, 16, 18, 20, 22];
 
 function App() {
   const initialDraftRef = useRef<ReturnType<typeof loadInitialDraft> | null>(null);
@@ -49,6 +70,7 @@ function App() {
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget>("kindle");
+  const [typography, setTypography] = useState<TypographySettings>(loadTypographySettings);
   const [qrUrl, setQrUrl] = useState("https://example.com");
   const [qrTitle, setQrTitle] = useState("Glamorous Shadow");
   const [qrSubtitle, setQrSubtitle] = useState("ヴェル13世×カーラ・マンソン デュエットver");
@@ -65,6 +87,14 @@ function App() {
   const qrImageInputRef = useRef<HTMLInputElement>(null);
 
   const rendered = useMemo(() => renderManuscript(manuscript, imageAssets), [imageAssets, manuscript]);
+  const typographyStyle = useMemo(
+    () =>
+      ({
+        "--writer-font-family": getWriterFontStack(typography.fontFamily),
+        "--writer-font-size": `${typography.fontSize}px`,
+      }) as CSSProperties,
+    [typography],
+  );
   const qrImageSrc = externalQrDataUrl || qrDataUrl;
 
   useEffect(() => {
@@ -80,6 +110,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(storageKeys.imageAssets, JSON.stringify(imageAssets));
   }, [imageAssets]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKeys.typography, JSON.stringify(typography));
+  }, [typography]);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,6 +172,23 @@ function App() {
     });
   };
 
+  const cutSelection = () => {
+    const editor = editorRef.current;
+    if (!editor) return false;
+
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    if (start === end) return false;
+
+    copyTextToClipboard(manuscript.slice(start, end));
+    updateManuscript(`${manuscript.slice(0, start)}${manuscript.slice(end)}`);
+    window.requestAnimationFrame(() => {
+      editor.focus();
+      editor.setSelectionRange(start, start);
+    });
+    return true;
+  };
+
   const applyHeadingOne = () => {
     const editor = editorRef.current;
     if (!editor) return;
@@ -182,6 +233,10 @@ function App() {
     insertAtSelection(`[${label}](${url})`);
   };
 
+  const insertInlineToc = () => {
+    insertAtSelection("\n\n[[TOC]]\n\n");
+  };
+
   const insertManuscriptImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = "";
@@ -214,13 +269,13 @@ function App() {
 
   const handleExportDocx = async () => {
     setStatus("DOCX作成中");
-    await exportDocx(manuscript, title, rendered);
+    await exportDocx(manuscript, title, rendered, typography);
     setStatus("DOCXを書き出しました");
   };
 
   const handleExportEpub = async () => {
     setStatus("EPUB作成中");
-    await exportEpub(rendered, title);
+    await exportEpub(rendered, title, typography);
     setStatus("EPUBを書き出しました");
   };
 
@@ -262,6 +317,19 @@ function App() {
       window.history.replaceState(null, "", `#${id}`);
       window.setTimeout(() => heading.classList.remove("jump-highlight"), 1800);
     }, 40);
+  };
+
+  const handlePreviewClick = (event: MouseEvent<HTMLElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const anchor = target.closest<HTMLAnchorElement>('a[href^="#"]');
+    const href = anchor?.getAttribute("href") || "";
+    const id = href.slice(1);
+    if (!id || !rendered.toc.some((item) => item.id === id)) return;
+
+    event.preventDefault();
+    jumpToHeading(id);
   };
 
   return (
@@ -343,7 +411,7 @@ function App() {
         </aside>
 
         {activeTab === "write" && (
-          <section className="writer-grid" aria-label="manuscript editor">
+          <section className="writer-grid" style={typographyStyle} aria-label="manuscript editor">
             <div className="control-strip">
               <div className="tool-buttons primary-tools">
                 <button title="選択行を見出し1にする" onClick={applyHeadingOne}>
@@ -360,6 +428,9 @@ function App() {
                 </button>
                 <button title="リンクに変換" onClick={addLink}>
                   <Link size={17} aria-hidden />
+                </button>
+                <button title="本文目次を挿入" onClick={insertInlineToc}>
+                  <ListTree size={17} aria-hidden />
                 </button>
                 <button title="画像を挿入" onClick={() => manuscriptImageInputRef.current?.click()}>
                   <ImageIcon size={17} aria-hidden />
@@ -394,6 +465,44 @@ function App() {
                 ))}
               </div>
 
+              <div className="typography-controls" aria-label="typography">
+                <label>
+                  <span>フォント</span>
+                  <select
+                    value={typography.fontFamily}
+                    onChange={(event) =>
+                      setTypography((current) => ({
+                        ...current,
+                        fontFamily: event.target.value as TypographySettings["fontFamily"],
+                      }))
+                    }
+                  >
+                    {fontOptions.map((font) => (
+                      <option key={font.value} value={font.value}>
+                        {font.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>サイズ</span>
+                  <select
+                    value={typography.fontSize}
+                    onChange={(event) =>
+                      setTypography((current) => ({
+                        ...current,
+                        fontSize: Number(event.target.value),
+                      }))
+                    }
+                  >
+                    {fontSizeOptions.map((size) => (
+                      <option key={size} value={size}>
+                        {size}px
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             </div>
 
             <div className="editor-pane">
@@ -410,6 +519,7 @@ function App() {
                   const isRedo =
                     (event.ctrlKey || event.metaKey) &&
                     (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
+                  const isCut = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "x";
 
                   if (isUndo) {
                     event.preventDefault();
@@ -420,13 +530,28 @@ function App() {
                     event.preventDefault();
                     redoManuscript();
                   }
+
+                  if (isCut && cutSelection()) {
+                    event.preventDefault();
+                  }
                 }}
               />
+              {rendered.images.length > 0 && (
+                <div className="editor-image-strip" aria-label="本文画像">
+                  {rendered.images.map((image) => (
+                    <figure className="editor-image-card" key={image.id}>
+                      <img src={image.src} alt="" />
+                      <figcaption>{image.alt || image.id}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
             </div>
 
             <article
               ref={previewRef}
               className={`preview-page ${direction} ${previewTarget}`}
+              onClick={handlePreviewClick}
               dangerouslySetInnerHTML={{ __html: rendered.html }}
             />
           </section>
@@ -632,6 +757,58 @@ function normalizeImageExtension(value: string): ImageAsset["extension"] {
   if (extension === "gif") return "gif";
   if (extension === "bmp") return "bmp";
   return "png";
+}
+
+function loadTypographySettings(): TypographySettings {
+  const stored = localStorage.getItem(storageKeys.typography);
+  if (!stored) return defaultTypography;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<TypographySettings>;
+    const fontFamily =
+      parsed.fontFamily === "noto-sans-jp" || parsed.fontFamily === "shippori-mincho"
+        ? parsed.fontFamily
+        : defaultTypography.fontFamily;
+    const fontSize =
+      typeof parsed.fontSize === "number" && fontSizeOptions.includes(parsed.fontSize)
+        ? parsed.fontSize
+        : defaultTypography.fontSize;
+
+    return {
+      fontFamily,
+      fontSize,
+    };
+  } catch {
+    return defaultTypography;
+  }
+}
+
+function getWriterFontStack(fontFamily: TypographySettings["fontFamily"]) {
+  if (fontFamily === "noto-sans-jp") {
+    return '"Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", sans-serif';
+  }
+
+  return '"Shippori Mincho", "Yu Mincho", "Hiragino Mincho ProN", "BIZ UDPMincho", serif';
+}
+
+function copyTextToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(value).catch(() => fallbackCopyText(value));
+    return;
+  }
+
+  fallbackCopyText(value);
+}
+
+function fallbackCopyText(value: string) {
+  const helper = document.createElement("textarea");
+  helper.value = value;
+  helper.style.position = "fixed";
+  helper.style.left = "-9999px";
+  document.body.appendChild(helper);
+  helper.select();
+  document.execCommand("copy");
+  helper.remove();
 }
 
 function loadAiSettings(): AiProviderConfig[] {
