@@ -396,6 +396,10 @@ select:focus {
   min-height: 0;
 }
 
+.docs-bridge-mode .primary-tools {
+  display: none;
+}
+
 .docs-bridge-mode .outline-panel {
   top: 90px;
 }
