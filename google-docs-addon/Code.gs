@@ -42,8 +42,14 @@ function getDocumentSnapshot() {
     readElement(body.getChild(index), blocks, toc, links);
   }
 
+  blocks
+    .filter((block) => block.type === 'toc')
+    .forEach((block) => {
+      block.items = toc.slice();
+    });
+
   const text = blocks
-    .filter((block) => block.type !== 'pageBreak')
+    .filter((block) => block.type !== 'pageBreak' && block.type !== 'toc')
     .map((block) => block.text || '')
     .join('\n');
 
@@ -138,6 +144,15 @@ function readElement(element, blocks, toc, links) {
     return;
   }
 
+  if (type === DocumentApp.ElementType.TABLE_OF_CONTENTS) {
+    blocks.push({
+      type: 'toc',
+      text: '',
+      items: [],
+    });
+    return;
+  }
+
   if (type === DocumentApp.ElementType.PAGE_BREAK) {
     blocks.push({ type: 'pageBreak', text: '' });
     return;
@@ -161,25 +176,43 @@ function readParagraph(element, blocks, toc, links) {
   const paragraph = element.getType() === DocumentApp.ElementType.LIST_ITEM
     ? element.asListItem()
     : element.asParagraph();
-  const text = paragraph.getText();
   const headingLevel = getHeadingLevel(paragraph);
-  const block = {
-    type: element.getType() === DocumentApp.ElementType.LIST_ITEM ? 'listItem' : 'paragraph',
-    text,
-    headingLevel,
-    id: headingLevel ? `heading-${toc.length + 1}` : '',
-  };
+  const blockType = element.getType() === DocumentApp.ElementType.LIST_ITEM ? 'listItem' : 'paragraph';
+  let segments = [];
+  let headingRegistered = false;
 
-  if (headingLevel) {
-    toc.push({
-      id: block.id,
-      title: text || '(無題の見出し)',
-      level: headingLevel,
-    });
+  for (let childIndex = 0; childIndex < paragraph.getNumChildren(); childIndex += 1) {
+    const child = paragraph.getChild(childIndex);
+    const childType = child.getType();
+
+    if (childType === DocumentApp.ElementType.TEXT) {
+      segments = segments.concat(readTextSegments(child.asText(), links));
+      continue;
+    }
+
+    if (childType === DocumentApp.ElementType.PAGE_BREAK) {
+      headingRegistered = pushParagraphBlock({
+        blocks,
+        toc,
+        blockType,
+        headingLevel,
+        segments,
+        headingRegistered,
+      });
+      blocks.push({ type: 'pageBreak', text: '' });
+      segments = [];
+    }
   }
 
-  collectParagraphLinks(paragraph).forEach((link) => links.push(link));
-  blocks.push(block);
+  pushParagraphBlock({
+    blocks,
+    toc,
+    blockType,
+    headingLevel,
+    segments,
+    headingRegistered,
+    allowEmpty: true,
+  });
 }
 
 function getHeadingLevel(paragraph) {
@@ -190,40 +223,78 @@ function getHeadingLevel(paragraph) {
   return 0;
 }
 
-function collectParagraphLinks(paragraph) {
-  const links = [];
+function pushParagraphBlock(payload) {
+  const segments = mergeAdjacentSegments(payload.segments || []);
+  const text = segments.map((segment) => segment.text).join('');
+  if (!payload.allowEmpty && !text) return payload.headingRegistered;
 
-  for (let childIndex = 0; childIndex < paragraph.getNumChildren(); childIndex += 1) {
-    const child = paragraph.getChild(childIndex);
-    if (child.getType() !== DocumentApp.ElementType.TEXT) continue;
+  const hasHeading = payload.headingLevel && !payload.headingRegistered;
+  const block = {
+    type: payload.blockType,
+    text,
+    segments,
+    headingLevel: payload.headingLevel,
+    id: hasHeading ? `heading-${payload.toc.length + 1}` : '',
+  };
 
-    const text = child.asText();
-    const value = text.getText();
-    let activeUrl = '';
-    let start = 0;
+  if (hasHeading) {
+    payload.toc.push({
+      id: block.id,
+      title: text || '(無題の見出し)',
+      level: payload.headingLevel,
+    });
+  }
 
-    for (let index = 0; index < value.length; index += 1) {
-      const url = text.getLinkUrl(index) || '';
-      if (url === activeUrl) continue;
+  payload.blocks.push(block);
+  return payload.headingRegistered || Boolean(hasHeading);
+}
 
-      if (activeUrl) {
-        links.push({
-          label: value.slice(start, index),
-          url: activeUrl,
-        });
-      }
+function readTextSegments(textElement, links) {
+  const value = textElement.getText();
+  if (!value) return [];
 
-      activeUrl = url;
-      start = index;
-    }
+  const segments = [];
+  let activeUrl = textElement.getLinkUrl(0) || '';
+  let start = 0;
+
+  for (let index = 1; index <= value.length; index += 1) {
+    const url = index < value.length ? textElement.getLinkUrl(index) || '' : null;
+    if (url === activeUrl) continue;
+
+    const label = value.slice(start, index);
+    segments.push({
+      text: label,
+      url: activeUrl,
+    });
 
     if (activeUrl) {
       links.push({
-        label: value.slice(start),
+        label,
         url: activeUrl,
       });
     }
+
+    activeUrl = url || '';
+    start = index;
   }
 
-  return links;
+  return segments;
+}
+
+function mergeAdjacentSegments(segments) {
+  return segments.reduce((merged, segment) => {
+    if (!segment.text) return merged;
+
+    const previous = merged[merged.length - 1];
+    if (previous && previous.url === segment.url) {
+      previous.text += segment.text;
+    } else {
+      merged.push({
+        text: segment.text,
+        url: segment.url || '',
+      });
+    }
+
+    return merged;
+  }, []);
 }

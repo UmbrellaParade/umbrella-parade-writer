@@ -233,6 +233,38 @@
         white-space: pre-wrap;
       }
 
+      .page a,
+      .doc-toc a {
+        color: #0b61d8;
+        text-decoration: underline;
+      }
+
+      .doc-toc {
+        border: 1px solid #ded2c0;
+        border-radius: 6px;
+        padding: 12px;
+        background: #fffdf8;
+        font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+      }
+
+      .doc-toc h2 {
+        margin-bottom: 8px;
+      }
+
+      .doc-toc a {
+        display: block;
+        margin-bottom: 6px;
+        cursor: pointer;
+      }
+
+      .doc-toc .level-2 {
+        padding-left: 14px;
+      }
+
+      .doc-toc .level-3 {
+        padding-left: 28px;
+      }
+
       .page-number {
         position: absolute;
         right: 8px;
@@ -543,16 +575,28 @@
             return `<section class="page ${state.target} ${state.direction}">${body}<span class="page-number">${index + 1}</span></section>`;
           })
           .join('');
+        bindHeadingLinks(container);
       }
 
       function renderBlock(block) {
         if (block.type === 'pageBreak') return '';
-        const text = formatInline(block.text || '');
+        if (block.type === 'toc') return renderDocToc(block);
+        const text = formatInlineSegments(block.segments || [{ text: block.text || '', url: '' }]);
         if (block.headingLevel === 1) return `<h1 id="${block.id}">${text}</h1>`;
         if (block.headingLevel === 2) return `<h2 id="${block.id}">${text}</h2>`;
         if (block.headingLevel === 3) return `<h3 id="${block.id}">${text}</h3>`;
         if (!text.trim()) return '<p><br></p>';
         return `<p>${text}</p>`;
+      }
+
+      function renderDocToc(block) {
+        const items = Array.isArray(block.items) ? block.items : [];
+        const links = items.length
+          ? items
+              .map((item) => `<a class="level-${item.level}" data-heading="${item.id}">${escapeHtml(item.title)}</a>`)
+              .join('')
+          : '<p class="muted">見出しがまだ見つかりません。</p>';
+        return `<nav class="doc-toc"><h2>目次</h2>${links}</nav>`;
       }
 
       function renderCheck() {
@@ -569,13 +613,7 @@
               .join('')
           : '<p class="muted">見出しがありません。各章タイトルは見出し1にしてください。</p>';
 
-        document.querySelectorAll('[data-heading]').forEach((link) => {
-          link.addEventListener('click', () => {
-            setTab('preview');
-            const heading = document.getElementById(link.dataset.heading);
-            if (heading) heading.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-          });
-        });
+        bindHeadingLinks(document.getElementById('toc'));
 
         document.getElementById('links').innerHTML = snapshot.links.length
           ? snapshot.links
@@ -616,6 +654,11 @@
       }
 
       function estimateUnits(block, target, direction) {
+        if (block.type === 'toc') {
+          const items = Array.isArray(block.items) ? block.items.length : 0;
+          return Math.max(4, items + 3);
+        }
+
         const textLength = (block.text || '').replace(/\s/g, '').length;
         const chars = direction === 'vertical'
           ? target === 'shimauma' ? 31 : 28
@@ -626,7 +669,28 @@
         return lines + 1;
       }
 
-      function formatInline(value) {
+      function bindHeadingLinks(root) {
+        root.querySelectorAll('[data-heading]').forEach((link) => {
+          link.addEventListener('click', (event) => {
+            event.preventDefault();
+            setTab('preview');
+            const heading = document.getElementById(link.dataset.heading);
+            if (heading) heading.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+          });
+        });
+      }
+
+      function formatInlineSegments(segments) {
+        return segments
+          .map((segment) => {
+            const text = formatInlineText(segment.text || '');
+            if (!segment.url) return text;
+            return `<a href="${escapeAttribute(segment.url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+          })
+          .join('');
+      }
+
+      function formatInlineText(value) {
         return escapeHtml(value)
           .replace(/｜([^《\n]+)《([^》\n]+)》/g, '<ruby>$1<rp>（</rp><rt>$2</rt><rp>）</rp></ruby>')
           .replace(/\n/g, '<br>');
