@@ -19,6 +19,7 @@ const fallbackTypography: TypographySettings = {
 
 const fallbackPageBreaks: PageBreakSettings = {
   chapterHead: true,
+  pageGuide: true,
 };
 
 export async function exportDocx(

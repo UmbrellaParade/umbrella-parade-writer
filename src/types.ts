@@ -6,6 +6,8 @@ export type WorkspaceTab = "write" | "qr" | "aplus" | "settings";
 
 export type WriterFontFamily = "noto-sans-jp" | "shippori-mincho";
 
+export type SalesChannel = "kindle" | "shimauma";
+
 export type AiProviderKey = "openai" | "anthropic" | "gemini";
 
 export interface AiProviderConfig {
@@ -22,6 +24,7 @@ export interface TypographySettings {
 
 export interface PageBreakSettings {
   chapterHead: boolean;
+  pageGuide: boolean;
 }
 
 export interface AplusSettings {

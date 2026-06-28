@@ -31,6 +31,7 @@ import type {
   ImageAsset,
   PageBreakSettings,
   PreviewTarget,
+  SalesChannel,
   TypographySettings,
   WorkspaceTab,
   WritingDirection,
@@ -45,6 +46,7 @@ const storageKeys = {
   pageBreaks: "umbrella-parade-writer:page-breaks",
   coverImage: "umbrella-parade-writer:cover-image",
   aplus: "umbrella-parade-writer:aplus",
+  salesChannel: "umbrella-parade-writer:sales-channel",
 };
 
 const previewLabels: Record<PreviewTarget, string> = {
@@ -66,6 +68,12 @@ const fontSizeOptions = [14, 16, 18, 20, 22];
 
 const defaultPageBreaks: PageBreakSettings = {
   chapterHead: true,
+  pageGuide: true,
+};
+
+const salesChannelLabels: Record<SalesChannel, string> = {
+  kindle: "Kindle",
+  shimauma: "しまうま",
 };
 
 const defaultAplus: AplusSettings = {
@@ -100,6 +108,7 @@ function App() {
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget>("kindle");
+  const [salesChannel, setSalesChannel] = useState<SalesChannel>(loadSalesChannel);
   const [typography, setTypography] = useState<TypographySettings>(loadTypographySettings);
   const [pageBreaks, setPageBreaks] = useState<PageBreakSettings>(loadPageBreakSettings);
   const [coverImage, setCoverImage] = useState<CoverImageState>(loadCoverImage);
@@ -154,6 +163,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(storageKeys.pageBreaks, JSON.stringify(pageBreaks));
   }, [pageBreaks]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKeys.salesChannel, salesChannel);
+  }, [salesChannel]);
 
   useEffect(() => {
     localStorage.setItem(storageKeys.coverImage, JSON.stringify(coverImage));
@@ -211,12 +224,14 @@ function App() {
     if (!editor) return;
     const start = editor.selectionStart;
     const end = editor.selectionEnd;
+    const scrollTop = editor.scrollTop;
     const next = `${manuscript.slice(0, start)}${value}${manuscript.slice(end)}`;
     updateManuscript(next);
     window.requestAnimationFrame(() => {
       editor.focus();
       const cursor = start + value.length - selectOffset;
       editor.setSelectionRange(cursor, cursor);
+      editor.scrollTop = scrollTop;
     });
   };
 
@@ -243,6 +258,7 @@ function App() {
 
     const start = editor.selectionStart;
     const end = editor.selectionEnd;
+    const scrollTop = editor.scrollTop;
     const lineStart = start === end ? manuscript.lastIndexOf("\n", Math.max(0, start - 1)) + 1 : start;
     const nextBreak = manuscript.indexOf("\n", end);
     const lineEnd = start === end ? (nextBreak === -1 ? manuscript.length : nextBreak) : end;
@@ -260,6 +276,7 @@ function App() {
     window.requestAnimationFrame(() => {
       editor.focus();
       editor.setSelectionRange(lineStart, lineStart + replacement.length);
+      editor.scrollTop = scrollTop;
     });
   };
 
@@ -406,6 +423,14 @@ function App() {
     }));
   };
 
+  const chooseSalesChannel = (channel: SalesChannel) => {
+    setSalesChannel(channel);
+    setPreviewTarget(channel);
+    if (channel === "kindle" && activeTab === "qr") {
+      setActiveTab("write");
+    }
+  };
+
   const scrollVerticalPreview = (side: "left" | "right") => {
     const preview = previewRef.current;
     if (!preview) return;
@@ -493,7 +518,12 @@ function App() {
             <FileText size={18} aria-hidden />
             原稿
           </button>
-          <button className={activeTab === "qr" ? "active" : ""} onClick={() => setActiveTab("qr")}>
+          <button
+            className={activeTab === "qr" ? "active" : ""}
+            onClick={() => setActiveTab("qr")}
+            disabled={salesChannel !== "shimauma"}
+            title={salesChannel === "shimauma" ? "しまうま用QRを作る" : "Kindleでは本文リンクを使います"}
+          >
             <QrCode size={18} aria-hidden />
             QR
           </button>
@@ -529,6 +559,26 @@ function App() {
             作品名
           </label>
           <input id="book-title" value={title} onChange={(event) => setTitle(event.target.value)} />
+
+          <div className="sales-channel-panel">
+            <p className="panel-title">制作先</p>
+            <div className="segmented compact-segmented">
+              {(Object.keys(salesChannelLabels) as SalesChannel[]).map((channel) => (
+                <button
+                  key={channel}
+                  className={salesChannel === channel ? "active" : ""}
+                  onClick={() => chooseSalesChannel(channel)}
+                >
+                  {salesChannelLabels[channel]}
+                </button>
+              ))}
+            </div>
+            <p className="mode-hint">
+              {salesChannel === "kindle"
+                ? "Kindleは本文リンクで誘導。QRは紙面用です。"
+                : "しまうまは紙面用。リンク先はQRで案内します。"}
+            </p>
+          </div>
 
           <div className="stats-row">
             <span>{rendered.wordCount.toLocaleString()}字</span>
@@ -589,7 +639,10 @@ function App() {
                 <button title="ルビを振る" onClick={addRuby}>
                   <Type size={17} aria-hidden />
                 </button>
-                <button title="リンクに変換" onClick={addLink}>
+                <button
+                  title={salesChannel === "kindle" ? "Kindle用リンクを埋め込む" : "紙面ではQR案内も確認してください"}
+                  onClick={addLink}
+                >
                   <Link size={17} aria-hidden />
                 </button>
                 <button title="本文目次を挿入" onClick={insertInlineToc}>
@@ -641,6 +694,19 @@ function App() {
                     }
                   />
                   章頭改ページ
+                </label>
+                <label className="toggle-control">
+                  <input
+                    type="checkbox"
+                    checked={pageBreaks.pageGuide}
+                    onChange={(event) =>
+                      setPageBreaks((current) => ({
+                        ...current,
+                        pageGuide: event.target.checked,
+                      }))
+                    }
+                  />
+                  ページガイド
                 </label>
                 {direction === "vertical" && (
                   <div className="vertical-scroll-buttons" aria-label="縦書き移動">
@@ -729,7 +795,9 @@ function App() {
 
             <article
               ref={previewRef}
-              className={`preview-page ${direction} ${previewTarget} ${pageBreaks.chapterHead ? "break-chapters" : ""}`}
+              className={`preview-page ${direction} ${previewTarget} ${pageBreaks.chapterHead ? "break-chapters" : ""} ${
+                pageBreaks.pageGuide ? "show-page-guides" : ""
+              }`}
               onClick={handlePreviewClick}
               dangerouslySetInnerHTML={{ __html: rendered.html }}
             />
@@ -739,6 +807,8 @@ function App() {
         {activeTab === "qr" && (
           <section className="qr-workspace" aria-label="qr maker">
             <div className="settings-panel">
+              <p className="mode-note">しまうまマルシェ用のQRを作ります。Kindleでは本文リンクを使います。</p>
+
               <label className="field-label" htmlFor="qr-url">
                 URL
               </label>
@@ -1098,10 +1168,16 @@ function loadPageBreakSettings(): PageBreakSettings {
     const parsed = JSON.parse(stored) as Partial<PageBreakSettings>;
     return {
       chapterHead: typeof parsed.chapterHead === "boolean" ? parsed.chapterHead : defaultPageBreaks.chapterHead,
+      pageGuide: typeof parsed.pageGuide === "boolean" ? parsed.pageGuide : defaultPageBreaks.pageGuide,
     };
   } catch {
     return defaultPageBreaks;
   }
+}
+
+function loadSalesChannel(): SalesChannel {
+  const stored = localStorage.getItem(storageKeys.salesChannel);
+  return stored === "shimauma" ? "shimauma" : "kindle";
 }
 
 function loadCoverImage(): CoverImageState {
