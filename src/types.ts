@@ -27,6 +27,8 @@ export interface ManuscriptImage {
   extension: "png" | "jpg" | "gif" | "bmp";
 }
 
+export type ImageAsset = ManuscriptImage;
+
 export interface RenderedManuscript {
   html: string;
   toc: TocItem[];

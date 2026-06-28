@@ -1,8 +1,8 @@
-import type { ManuscriptImage, RenderedManuscript, TocItem } from "../types";
+import type { ImageAsset, ManuscriptImage, RenderedManuscript, TocItem } from "../types";
 
 const headingOne = /^#\s+(.+)$/;
 const headingTwo = /^##\s+(.+)$/;
-const imageLine = /^!\[([^\]]*)\]\((data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
+const imageLine = /^!\[([^\]]*)\]\((asset:[A-Za-z0-9_-]+|data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
 
 export const sampleManuscript = `# 第一章　傘の下の約束
 
@@ -20,7 +20,7 @@ export const sampleManuscript = `# 第一章　傘の下の約束
 
 招待状には、細い青の下線でリンクが引かれていた。`;
 
-export function renderManuscript(markdown: string): RenderedManuscript {
+export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = []): RenderedManuscript {
   const toc: TocItem[] = [];
   const images: ManuscriptImage[] = [];
   const htmlBlocks: string[] = [];
@@ -42,7 +42,7 @@ export function renderManuscript(markdown: string): RenderedManuscript {
 
     const h1 = line.match(headingOne);
     const h2 = line.match(headingTwo);
-    const image = parseMarkdownImageLine(line, images.length + 1);
+    const image = parseMarkdownImageLine(line, images.length + 1, imageAssets);
 
     if (h1) {
       flushParagraph();
@@ -64,7 +64,7 @@ export function renderManuscript(markdown: string): RenderedManuscript {
 
     if (image) {
       flushParagraph();
-      if (image.src.startsWith("data:image/")) images.push(image);
+      if (!images.some((item) => item.id === image.id)) images.push(image);
       htmlBlocks.push(
         `<figure class="manuscript-image"><img src="${escapeHtml(image.src)}" alt="${escapeHtml(
           image.alt,
@@ -118,19 +118,26 @@ export function stripMarkupForDocx(text: string): string {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1（$2）");
 }
 
-export function parseMarkdownImageLine(line: string, index = 1): ManuscriptImage | undefined {
+export function parseMarkdownImageLine(
+  line: string,
+  index = 1,
+  imageAssets: ImageAsset[] = [],
+): ManuscriptImage | undefined {
   const match = line.trim().match(imageLine);
   if (!match) return undefined;
 
-  const src = match[2];
+  const rawSrc = match[2];
+  const assetId = rawSrc.startsWith("asset:") ? rawSrc.replace("asset:", "") : "";
+  const asset = assetId ? imageAssets.find((item) => item.id === assetId) : undefined;
+  const src = asset?.src || rawSrc;
   const mimeMatch = src.match(/^data:(image\/(png|jpe?g|gif|bmp));base64,/i);
-  const mimeType = mimeMatch?.[1]?.toLowerCase() || "image/png";
-  const rawExtension = mimeMatch?.[2]?.toLowerCase() || src.split(".").pop()?.toLowerCase() || "png";
+  const mimeType = asset?.mimeType || mimeMatch?.[1]?.toLowerCase() || "image/png";
+  const rawExtension = asset?.extension || mimeMatch?.[2]?.toLowerCase() || src.split(".").pop()?.toLowerCase() || "png";
   const extension = rawExtension === "jpeg" ? "jpg" : normalizeImageExtension(rawExtension);
 
   return {
-    id: `image-${index}`,
-    alt: match[1].trim(),
+    id: asset?.id || `image-${index}`,
+    alt: match[1].trim() || asset?.alt || "",
     src,
     mimeType,
     extension,

@@ -12,8 +12,8 @@ import {
   stripMarkupForDocx,
 } from "./manuscript";
 
-export async function exportDocx(markdown: string, title: string) {
-  const children = await createDocxChildren(markdown);
+export async function exportDocx(markdown: string, title: string, rendered: RenderedManuscript) {
+  const children = await createDocxChildren(markdown, rendered);
 
   const doc = new Document({
     sections: [
@@ -117,7 +117,7 @@ function createNavXhtml(title: string, toc: TocItem[]) {
 </html>`;
 }
 
-async function createDocxChildren(markdown: string) {
+async function createDocxChildren(markdown: string, rendered: RenderedManuscript) {
   const children: Paragraph[] = [];
   let seenHeadingOne = false;
 
@@ -126,7 +126,7 @@ async function createDocxChildren(markdown: string) {
     .split("\n")
     .map((value) => value.trimEnd())
     .filter((value) => value.length > 0)) {
-    const image = parseMarkdownImageLine(line);
+    const image = parseMarkdownImageLine(line, undefined, rendered.images);
 
     if (image?.src.startsWith("data:image/")) {
       const size = await getDataImageSize(image.src);

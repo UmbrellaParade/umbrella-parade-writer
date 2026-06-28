@@ -10,9 +10,11 @@ import {
   ImageIcon,
   Link,
   QrCode,
+  Redo2,
   Settings,
   Sparkles,
   Type,
+  Undo2,
   Upload,
   X,
 } from "lucide-react";
@@ -20,12 +22,13 @@ import QRCode from "qrcode";
 import { AI_PROVIDERS, getDefaultAiSettings } from "./data/aiModels";
 import { exportDocx, exportEpub, exportPdf } from "./lib/exporters";
 import { renderManuscript, sampleManuscript } from "./lib/manuscript";
-import type { AiProviderConfig, PreviewTarget, WorkspaceTab, WritingDirection } from "./types";
+import type { AiProviderConfig, ImageAsset, PreviewTarget, WorkspaceTab, WritingDirection } from "./types";
 
 const storageKeys = {
   manuscript: "umbrella-parade-writer:manuscript",
   title: "umbrella-parade-writer:title",
   aiSettings: "umbrella-parade-writer:ai-settings",
+  imageAssets: "umbrella-parade-writer:image-assets",
 };
 
 const previewLabels: Record<PreviewTarget, string> = {
@@ -35,9 +38,15 @@ const previewLabels: Record<PreviewTarget, string> = {
 };
 
 function App() {
+  const initialDraftRef = useRef<ReturnType<typeof loadInitialDraft> | null>(null);
+  if (!initialDraftRef.current) initialDraftRef.current = loadInitialDraft();
+
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("write");
   const [title, setTitle] = useState(() => localStorage.getItem(storageKeys.title) || "Umbrella Parade Manuscript");
-  const [manuscript, setManuscript] = useState(() => localStorage.getItem(storageKeys.manuscript) || sampleManuscript);
+  const [manuscript, setManuscript] = useState(initialDraftRef.current.manuscript);
+  const [imageAssets, setImageAssets] = useState<ImageAsset[]>(initialDraftRef.current.imageAssets);
+  const [undoStack, setUndoStack] = useState<string[]>([]);
+  const [redoStack, setRedoStack] = useState<string[]>([]);
   const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget>("kindle");
   const [qrUrl, setQrUrl] = useState("https://example.com");
@@ -55,7 +64,7 @@ function App() {
   const manuscriptImageInputRef = useRef<HTMLInputElement>(null);
   const qrImageInputRef = useRef<HTMLInputElement>(null);
 
-  const rendered = useMemo(() => renderManuscript(manuscript), [manuscript]);
+  const rendered = useMemo(() => renderManuscript(manuscript, imageAssets), [imageAssets, manuscript]);
   const qrImageSrc = externalQrDataUrl || qrDataUrl;
 
   useEffect(() => {
@@ -67,6 +76,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem(storageKeys.aiSettings, JSON.stringify(aiSettings));
   }, [aiSettings]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKeys.imageAssets, JSON.stringify(imageAssets));
+  }, [imageAssets]);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,13 +97,40 @@ function App() {
     };
   }, [qrUrl]);
 
+  const updateManuscript = (next: string) => {
+    if (next === manuscript) return;
+    setUndoStack((current) => [...current.slice(-99), manuscript]);
+    setRedoStack([]);
+    setManuscript(next);
+  };
+
+  const undoManuscript = () => {
+    setUndoStack((current) => {
+      const previous = current.at(-1);
+      if (previous === undefined) return current;
+      setRedoStack((redo) => [...redo.slice(-99), manuscript]);
+      setManuscript(previous);
+      return current.slice(0, -1);
+    });
+  };
+
+  const redoManuscript = () => {
+    setRedoStack((current) => {
+      const next = current.at(-1);
+      if (next === undefined) return current;
+      setUndoStack((undo) => [...undo.slice(-99), manuscript]);
+      setManuscript(next);
+      return current.slice(0, -1);
+    });
+  };
+
   const insertAtSelection = (value: string, selectOffset = 0) => {
     const editor = editorRef.current;
     if (!editor) return;
     const start = editor.selectionStart;
     const end = editor.selectionEnd;
     const next = `${manuscript.slice(0, start)}${value}${manuscript.slice(end)}`;
-    setManuscript(next);
+    updateManuscript(next);
     window.requestAnimationFrame(() => {
       editor.focus();
       const cursor = start + value.length - selectOffset;
@@ -117,7 +157,7 @@ function App() {
       })
       .join("\n");
 
-    setManuscript(`${manuscript.slice(0, lineStart)}${replacement}${manuscript.slice(lineEnd)}`);
+    updateManuscript(`${manuscript.slice(0, lineStart)}${replacement}${manuscript.slice(lineEnd)}`);
     window.requestAnimationFrame(() => {
       editor.focus();
       editor.setSelectionRange(lineStart, lineStart + replacement.length);
@@ -151,7 +191,9 @@ function App() {
     reader.onload = () => {
       const imageSource = typeof reader.result === "string" ? reader.result : "";
       const alt = file.name.replace(/\.[^.]+$/, "");
-      insertAtSelection(`\n\n![${alt}](${imageSource})\n\n`);
+      const asset = createImageAsset(file, imageSource, alt);
+      setImageAssets((current) => upsertImageAsset(current, asset));
+      insertAtSelection(`\n\n![${alt}](asset:${asset.id})\n\n`);
       setStatus("画像を挿入しました");
     };
     reader.readAsDataURL(file);
@@ -172,7 +214,7 @@ function App() {
 
   const handleExportDocx = async () => {
     setStatus("DOCX作成中");
-    await exportDocx(manuscript, title);
+    await exportDocx(manuscript, title, rendered);
     setStatus("DOCXを書き出しました");
   };
 
@@ -307,6 +349,12 @@ function App() {
                 <button title="選択行を見出し1にする" onClick={applyHeadingOne}>
                   <Heading1 size={17} aria-hidden />
                 </button>
+                <button title="元に戻す" onClick={undoManuscript} disabled={!undoStack.length}>
+                  <Undo2 size={17} aria-hidden />
+                </button>
+                <button title="やり直す" onClick={redoManuscript} disabled={!redoStack.length}>
+                  <Redo2 size={17} aria-hidden />
+                </button>
                 <button title="ルビを振る" onClick={addRuby}>
                   <Type size={17} aria-hidden />
                 </button>
@@ -355,7 +403,23 @@ function App() {
                 spellCheck={false}
                 onChange={(event) => {
                   setStatus("編集中");
-                  setManuscript(event.target.value);
+                  updateManuscript(event.target.value);
+                }}
+                onKeyDown={(event) => {
+                  const isUndo = (event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z";
+                  const isRedo =
+                    (event.ctrlKey || event.metaKey) &&
+                    (event.key.toLowerCase() === "y" || (event.shiftKey && event.key.toLowerCase() === "z"));
+
+                  if (isUndo) {
+                    event.preventDefault();
+                    undoManuscript();
+                  }
+
+                  if (isRedo) {
+                    event.preventDefault();
+                    redoManuscript();
+                  }
                 }}
               />
             </div>
@@ -504,6 +568,70 @@ function App() {
       </main>
     </div>
   );
+}
+
+function loadInitialDraft() {
+  const storedManuscript = localStorage.getItem(storageKeys.manuscript) || sampleManuscript;
+  const storedAssets = loadImageAssets();
+  return migrateInlineImages(storedManuscript, storedAssets);
+}
+
+function loadImageAssets(): ImageAsset[] {
+  const stored = localStorage.getItem(storageKeys.imageAssets);
+  if (!stored) return [];
+
+  try {
+    const parsed = JSON.parse(stored) as ImageAsset[];
+    return Array.isArray(parsed) ? parsed.filter((item) => item.id && item.src) : [];
+  } catch {
+    return [];
+  }
+}
+
+function migrateInlineImages(manuscript: string, imageAssets: ImageAsset[]) {
+  let nextManuscript = manuscript;
+  let nextAssets = imageAssets;
+  const inlineImagePattern = /!\[([^\]]*)\]\((data:image\/(png|jpe?g|gif|bmp);base64,[^)]+)\)/gi;
+
+  nextManuscript = nextManuscript.replace(inlineImagePattern, (_match, alt: string, src: string) => {
+    const existing = nextAssets.find((asset) => asset.src === src);
+    if (existing) return `![${alt || existing.alt}](asset:${existing.id})`;
+
+    const asset = createImageAsset(undefined, src, alt || "画像");
+    nextAssets = upsertImageAsset(nextAssets, asset);
+    return `![${alt || asset.alt}](asset:${asset.id})`;
+  });
+
+  return {
+    manuscript: nextManuscript,
+    imageAssets: nextAssets,
+  };
+}
+
+function createImageAsset(file: File | undefined, src: string, alt: string): ImageAsset {
+  const mimeType = file?.type || src.match(/^data:(image\/[^;]+);base64,/)?.[1] || "image/png";
+  const extension = normalizeImageExtension(file?.name.split(".").pop() || mimeType.split("/")[1] || "png");
+
+  return {
+    id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    alt: alt || file?.name.replace(/\.[^.]+$/, "") || "画像",
+    src,
+    mimeType,
+    extension,
+  };
+}
+
+function upsertImageAsset(assets: ImageAsset[], asset: ImageAsset) {
+  const withoutSame = assets.filter((item) => item.id !== asset.id && item.src !== asset.src);
+  return [...withoutSame, asset];
+}
+
+function normalizeImageExtension(value: string): ImageAsset["extension"] {
+  const extension = value.toLowerCase();
+  if (extension === "jpg" || extension === "jpeg") return "jpg";
+  if (extension === "gif") return "gif";
+  if (extension === "bmp") return "bmp";
+  return "png";
 }
 
 function loadAiSettings(): AiProviderConfig[] {
