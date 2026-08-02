@@ -8,6 +8,11 @@ const chapterBreakMarker = /^\[\[CHAPTER_BREAK\]\]$/i;
 const blankLineMarker = /^\[\[BLANK_LINE\]\]$/i;
 const imageLine = /^!\[([^\]]*)\]\((asset:[A-Za-z0-9_-]+|data:image\/(png|jpe?g|gif|bmp);base64,[^)]+|https?:\/\/[^)\s]+)\)$/i;
 
+export type RenderManuscriptOptions = {
+  tocLinks?: boolean;
+  tocPageNumbers?: Record<string, number>;
+};
+
 export const sampleManuscript = `# 第一章　傘の下の約束
 
 雨の匂いが、石畳の街を静かに包んでいた。
@@ -24,7 +29,11 @@ export const sampleManuscript = `# 第一章　傘の下の約束
 
 招待状には、細い青の下線でリンクが引かれていた。`;
 
-export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = []): RenderedManuscript {
+export function renderManuscript(
+  markdown: string,
+  imageAssets: ImageAsset[] = [],
+  options: RenderManuscriptOptions = {},
+): RenderedManuscript {
   const images: ManuscriptImage[] = [];
   const htmlBlocks: string[] = [];
   const lines = markdown.replace(/\r\n/g, "\n").split("\n");
@@ -51,7 +60,7 @@ export function renderManuscript(markdown: string, imageAssets: ImageAsset[] = [
 
     if (inlineTocMarker.test(line.trim())) {
       flushParagraph();
-      htmlBlocks.push(createInlineToc(toc));
+      htmlBlocks.push(createInlineToc(toc, options));
       return;
     }
 
@@ -180,12 +189,22 @@ function createToc(lines: string[]): TocItem[] {
   return toc;
 }
 
-function createInlineToc(toc: TocItem[]) {
+function createInlineToc(toc: TocItem[], options: RenderManuscriptOptions = {}) {
   const entries = toc
-    .map(
-      (item) =>
-        `<li class="toc-level-${item.level}"><a href="#${item.id}">${escapeHtml(item.title)}</a></li>`,
-    )
+    .map((item) => {
+      const title = escapeHtml(item.title);
+      const titleHtml =
+        options.tocLinks === false
+          ? `<span class="toc-entry-title">${title}</span>`
+          : `<a class="toc-entry-title" href="#${item.id}">${title}</a>`;
+      const pageNumber = options.tocPageNumbers?.[item.id];
+      const pageNumberHtml =
+        typeof pageNumber === "number"
+          ? `<span class="toc-page-number" aria-label="ページ ${pageNumber}">${pageNumber}</span>`
+          : "";
+
+      return `<li class="toc-level-${item.level}">${titleHtml}${pageNumberHtml}</li>`;
+    })
     .join("");
 
   return `<nav class="manuscript-toc" aria-label="目次"><h2>目次</h2>${

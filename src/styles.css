@@ -634,6 +634,28 @@ select:focus {
   padding-inline-start: 1.5em;
 }
 
+.visual-editor .manuscript-toc li,
+.preview-page .manuscript-toc li {
+  padding-inline-end: 2.8em;
+}
+
+.visual-editor .manuscript-toc .toc-entry-title,
+.preview-page .manuscript-toc .toc-entry-title {
+  min-width: 0;
+}
+
+.visual-editor .manuscript-toc .toc-page-number,
+.preview-page .manuscript-toc .toc-page-number {
+  float: right;
+  margin-inline-start: 0.85em;
+  color: #6f6252;
+  font-family:
+    "Yu Gothic", "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", system-ui, sans-serif;
+  font-size: 0.86em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .visual-editor .jump-highlight {
   background: rgba(255, 218, 112, 0.34);
   box-shadow: 0 0 0 8px rgba(255, 218, 112, 0.2);

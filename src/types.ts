@@ -29,6 +29,13 @@ export interface PageBreakSettings {
   pageGuide: boolean;
 }
 
+export interface TocSettings {
+  links: boolean;
+  pageNumbers: boolean;
+}
+
+export type TocSettingsByChannel = Record<SalesChannel, TocSettings>;
+
 export interface AplusImageItem {
   id: string;
   imageSrc: string;

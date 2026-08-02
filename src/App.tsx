@@ -34,6 +34,8 @@ import type {
   LegacyAplusSettings,
   PageBreakSettings,
   SalesChannel,
+  TocSettings,
+  TocSettingsByChannel,
   TypographySettings,
   WorkspaceTab,
   WritingDirection,
@@ -47,6 +49,7 @@ const storageKeys = {
   imageAssets: "umbrella-parade-writer:image-assets",
   typography: "umbrella-parade-writer:typography",
   pageBreaks: "umbrella-parade-writer:page-breaks",
+  tocSettings: "umbrella-parade-writer:toc-settings",
   coverImage: "umbrella-parade-writer:cover-image",
   aplus: "umbrella-parade-writer:aplus",
   salesChannel: "umbrella-parade-writer:sales-channel",
@@ -67,6 +70,17 @@ const fontSizeOptions = [14, 16, 18, 20, 22];
 const defaultPageBreaks: PageBreakSettings = {
   chapterHead: true,
   pageGuide: true,
+};
+
+const defaultTocSettings: TocSettingsByChannel = {
+  kindle: {
+    links: true,
+    pageNumbers: false,
+  },
+  shimauma: {
+    links: false,
+    pageNumbers: true,
+  },
 };
 
 const salesChannelLabels: Record<SalesChannel, string> = {
@@ -164,6 +178,7 @@ function App() {
   const [direction, setDirection] = useState<WritingDirection>("horizontal");
   const [typography, setTypography] = useState<TypographySettings>(loadTypographySettings);
   const [pageBreaks, setPageBreaks] = useState<PageBreakSettings>(loadPageBreakSettings);
+  const [tocSettings, setTocSettings] = useState<TocSettingsByChannel>(loadTocSettings);
   const [coverImage, setCoverImage] = useState<CoverImageState>(loadCoverImage);
   const [aplus, setAplus] = useState<AplusSettings>(loadAplusSettings);
   const [qrUrl, setQrUrl] = useState("https://example.com");
@@ -188,7 +203,29 @@ function App() {
 
   const manuscript = manuscripts[salesChannel] ?? sampleManuscript;
   const previewTarget = salesChannel;
-  const rendered = useMemo(() => renderManuscript(manuscript, imageAssets), [imageAssets, manuscript]);
+  const activeTocSettings = tocSettings[salesChannel] ?? defaultTocSettings[salesChannel];
+  const baseRendered = useMemo(
+    () => renderManuscript(manuscript, imageAssets, { tocLinks: activeTocSettings.links }),
+    [activeTocSettings.links, imageAssets, manuscript],
+  );
+  const basePreviewPages = useMemo(
+    () => paginatePreviewHtml(baseRendered.html, typography, direction, previewTarget, pageBreaks.chapterHead),
+    [baseRendered.html, direction, pageBreaks.chapterHead, previewTarget, typography],
+  );
+  const tocPageNumbers = useMemo(
+    () => (activeTocSettings.pageNumbers ? createTocPageNumberMap(basePreviewPages) : {}),
+    [activeTocSettings.pageNumbers, basePreviewPages],
+  );
+  const rendered = useMemo(
+    () =>
+      activeTocSettings.pageNumbers
+        ? renderManuscript(manuscript, imageAssets, {
+            tocLinks: activeTocSettings.links,
+            tocPageNumbers,
+          })
+        : baseRendered,
+    [activeTocSettings.links, activeTocSettings.pageNumbers, baseRendered, imageAssets, manuscript, tocPageNumbers],
+  );
   const previewPages = useMemo(
     () => paginatePreviewHtml(rendered.html, typography, direction, previewTarget, pageBreaks.chapterHead),
     [direction, pageBreaks.chapterHead, previewTarget, rendered.html, typography],
@@ -245,6 +282,10 @@ function App() {
   useEffect(() => {
     if (!writeStorageJson(storageKeys.pageBreaks, pageBreaks)) setStatus(storageWriteErrorMessage);
   }, [pageBreaks]);
+
+  useEffect(() => {
+    if (!writeStorageJson(storageKeys.tocSettings, tocSettings)) setStatus(storageWriteErrorMessage);
+  }, [tocSettings]);
 
   useEffect(() => {
     if (!writeStorageValue(storageKeys.salesChannel, salesChannel)) setStatus(storageWriteErrorMessage);
@@ -613,7 +654,7 @@ function App() {
 
   const insertInlineToc = () => {
     if (editorMode === "visual") {
-      insertVisualHtml(createVisualTocHtml(rendered.toc));
+      insertVisualHtml(createVisualTocHtml(rendered.toc, activeTocSettings, tocPageNumbers));
       return;
     }
 
@@ -787,6 +828,16 @@ function App() {
     if (channel === "kindle" && activeTab === "qr") {
       setActiveTab("write");
     }
+  };
+
+  const updateActiveTocSetting = (field: keyof TocSettings, value: boolean) => {
+    setTocSettings((current) => ({
+      ...current,
+      [salesChannel]: {
+        ...(current[salesChannel] ?? defaultTocSettings[salesChannel]),
+        [field]: value,
+      },
+    }));
   };
 
   const scrollVerticalPreview = (side: "left" | "right") => {
@@ -1145,6 +1196,22 @@ function App() {
                     }
                   />
                   ページガイド
+                </label>
+                <label className="toggle-control">
+                  <input
+                    type="checkbox"
+                    checked={activeTocSettings.links}
+                    onChange={(event) => updateActiveTocSetting("links", event.target.checked)}
+                  />
+                  目次リンク
+                </label>
+                <label className="toggle-control">
+                  <input
+                    type="checkbox"
+                    checked={activeTocSettings.pageNumbers}
+                    onChange={(event) => updateActiveTocSetting("pageNumbers", event.target.checked)}
+                  />
+                  目次ページ番号
                 </label>
                 {direction === "vertical" && (
                   <div className="vertical-scroll-buttons" aria-label="縦書き移動">
@@ -1619,6 +1686,19 @@ function paginatePreviewHtml(
 
   flushPage();
   return pages.length ? pages : [{ html: "", pageNumber: 1 }];
+}
+
+function createTocPageNumberMap(pages: PreviewPage[]) {
+  const pageNumbers: Record<string, number> = {};
+
+  pages.forEach((page) => {
+    const documentFromPage = new DOMParser().parseFromString(page.html, "text/html");
+    documentFromPage.querySelectorAll<HTMLElement>("h1[id],h2[id]").forEach((heading) => {
+      if (!pageNumbers[heading.id]) pageNumbers[heading.id] = page.pageNumber;
+    });
+  });
+
+  return pageNumbers;
 }
 
 function getPreviewPageCapacity(
@@ -2527,9 +2607,25 @@ function getSelectedVisualBlock(root: HTMLElement) {
   return block;
 }
 
-function createVisualTocHtml(toc: { id: string; title: string; level: 1 | 2 }[]) {
+function createVisualTocHtml(
+  toc: { id: string; title: string; level: 1 | 2 }[],
+  settings: TocSettings,
+  pageNumbers: Record<string, number>,
+) {
   const entries = toc
-    .map((item) => `<li class="toc-level-${item.level}"><a href="#${item.id}">${escapeHtml(item.title)}</a></li>`)
+    .map((item) => {
+      const title = escapeHtml(item.title);
+      const titleHtml = settings.links
+        ? `<a class="toc-entry-title" href="#${item.id}">${title}</a>`
+        : `<span class="toc-entry-title">${title}</span>`;
+      const pageNumber = settings.pageNumbers ? pageNumbers[item.id] : undefined;
+      const pageNumberHtml =
+        typeof pageNumber === "number"
+          ? `<span class="toc-page-number" aria-label="ページ ${pageNumber}">${pageNumber}</span>`
+          : "";
+
+      return `<li class="toc-level-${item.level}">${titleHtml}${pageNumberHtml}</li>`;
+    })
     .join("");
 
   return `<nav class="manuscript-toc" aria-label="目次"><h2>目次</h2>${
@@ -2608,6 +2704,28 @@ function loadPageBreakSettings(): PageBreakSettings {
   } catch {
     return defaultPageBreaks;
   }
+}
+
+function loadTocSettings(): TocSettingsByChannel {
+  const stored = readStorageValue(storageKeys.tocSettings);
+  if (!stored) return defaultTocSettings;
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<Record<SalesChannel, Partial<TocSettings>>>;
+    return {
+      kindle: normalizeTocSettings(parsed.kindle, defaultTocSettings.kindle),
+      shimauma: normalizeTocSettings(parsed.shimauma, defaultTocSettings.shimauma),
+    };
+  } catch {
+    return defaultTocSettings;
+  }
+}
+
+function normalizeTocSettings(settings: Partial<TocSettings> | undefined, fallback: TocSettings): TocSettings {
+  return {
+    links: typeof settings?.links === "boolean" ? settings.links : fallback.links,
+    pageNumbers: typeof settings?.pageNumbers === "boolean" ? settings.pageNumbers : fallback.pageNumbers,
+  };
 }
 
 function loadSalesChannel(): SalesChannel {
